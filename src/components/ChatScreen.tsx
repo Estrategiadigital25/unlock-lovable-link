@@ -88,7 +88,7 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
           </h1>
           <div className="flex items-center gap-2 text-muted-foreground">
             <span className="text-lg">🔐</span>
-            <p className="text-sm">
+            <p className="text-sm font-semibold">
               Tus búsquedas no se guardan automáticamente. Si deseas conservar esta conversación, debes descargarla.
             </p>
           </div>
