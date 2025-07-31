@@ -1,14 +1,34 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from "react";
+import LoginScreen from "@/components/LoginScreen";
+import ChatScreen from "@/components/ChatScreen";
+import AdminPanel from "@/components/AdminPanel";
+
+type Screen = 'login' | 'chat' | 'admin';
 
 const Index = () => {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
-    </div>
-  );
+  const [currentScreen, setCurrentScreen] = useState<Screen>('login');
+
+  const handleLogin = () => {
+    setCurrentScreen('chat');
+  };
+
+  const handleAdminPanel = () => {
+    setCurrentScreen('admin');
+  };
+
+  const handleBackToChat = () => {
+    setCurrentScreen('chat');
+  };
+
+  if (currentScreen === 'login') {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
+
+  if (currentScreen === 'admin') {
+    return <AdminPanel onBack={handleBackToChat} />;
+  }
+
+  return <ChatScreen onAdminPanel={handleAdminPanel} />;
 };
 
 export default Index;
