@@ -18,28 +18,7 @@ interface Message {
 }
 
 const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      type: 'user',
-      content: '¿Qué tipo de enzima sería más adecuada para formular un detergente líquido institucional con enfoque en manchas de proteína, compatible con surfactantes ecosolve?',
-      timestamp: new Date()
-    },
-    {
-      id: '2',
-      type: 'assistant',
-      content: `Para un detergente líquido institucional enfocado en manchas proteicas, una buena opción sería incorporar una proteasa alcalina, idealmente con estabilidad en rangos de pH entre 9 y 11.
-
-Estas enzimas degradan eficazmente proteínas como sangre, huevo o residuos alimentarios comunes en entornos institucionales.
-
-Dado que estás utilizando Ecosolve, que es un surfactante de alto desempeño y biodegradable, es importante asegurar compatibilidad en formulación. Se recomienda:
-
-• Usar un sistema tampón que estabilice el pH.
-• Incorporar la enzima en la fase fría, a temperaturas inferiores a 45 °C.
-• Validar con pruebas de estabilidad de espuma y detergencia.`,
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   
   const [inputValue, setInputValue] = useState('');
   
