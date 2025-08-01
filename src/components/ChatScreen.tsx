@@ -83,12 +83,13 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
 
   // Cargar datos del localStorage al iniciar
   useEffect(() => {
-    const savedHistory = localStorage.getItem('chat_history');
+    const historialCompleto = localStorage.getItem("historialGPT");
     const savedGPTs = localStorage.getItem('custom_gpts');
     
-    if (savedHistory) {
+    if (historialCompleto) {
       try {
-        setHistorialBusquedas(JSON.parse(savedHistory));
+        const historial = JSON.parse(historialCompleto);
+        setHistorialBusquedas(historial.map((item: any) => item.pregunta || item));
       } catch (error) {
         console.error('Error loading history:', error);
       }
@@ -103,17 +104,31 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
     }
   }, []);
 
-  // Guardar historial en localStorage
-  const saveToHistory = (query: string) => {
-    const updatedHistory = [query, ...historialBusquedas.slice(0, 19)]; // Máximo 20 elementos
-    setHistorialBusquedas(updatedHistory);
-    localStorage.setItem('chat_history', JSON.stringify(updatedHistory));
+  // Guardar historial en localStorage con estructura mejorada
+  const saveToHistory = (query: string, response?: string) => {
+    let historial = JSON.parse(localStorage.getItem("historialGPT") || "[]");
+    
+    // Estructura mejorada con validación
+    const nuevaBusqueda = {
+      id: Date.now().toString(),
+      fecha: new Date().toLocaleString('es-ES'),
+      pregunta: query.trim(),
+      respuesta: response || "Pendiente...",
+      gptUsado: [...defaultGPTs, ...customGPTs].find(gpt => gpt.id === selectedGPT)?.name || 'GPT Base'
+    };
+    
+    // Agregar al inicio y limitar a 50 elementos para no sobrecargar localStorage
+    historial.unshift(nuevaBusqueda);
+    historial = historial.slice(0, 50);
+    
+    localStorage.setItem("historialGPT", JSON.stringify(historial));
+    setHistorialBusquedas(historial.map(item => item.pregunta));
   };
 
   // Limpiar historial
   const clearHistory = () => {
     setHistorialBusquedas([]);
-    localStorage.removeItem('chat_history');
+    localStorage.removeItem("historialGPT");
     toast({
       title: "Historial limpiado",
       description: "Se ha eliminado todo el historial de búsquedas.",
@@ -269,7 +284,7 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
           <div className="flex items-center gap-2 text-muted-foreground">
             <span className="text-lg">🔐</span>
             <p className="text-sm font-semibold">
-              Tus búsquedas no se guardan automáticamente. Si deseas conservar esta conversación, debes descargarla.
+              Tu historial se guarda localmente en tu navegador. Máximo 50 búsquedas por seguridad. Puedes descargar conversaciones importantes.
             </p>
           </div>
         </div>
