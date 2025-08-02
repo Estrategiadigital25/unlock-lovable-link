@@ -46,7 +46,7 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   const [inputValue, setInputValue] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [historialBusquedas, setHistorialBusquedas] = useState<string[]>([]);
-  const [selectedGPT, setSelectedGPT] = useState<string>('default');
+  const [selectedGPT, setSelectedGPT] = useState<string>('gpt4');
   const [customGPTs, setCustomGPTs] = useState<CustomGPT[]>([]);
   const [isCreatingGPT, setIsCreatingGPT] = useState(false);
   const [newGPTName, setNewGPTName] = useState('');
@@ -55,29 +55,15 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  // GPTs predefinidos
+  // GPT principal para todas las búsquedas
   const defaultGPTs: CustomGPT[] = [
     {
-      id: 'default',
-      name: 'Formulación & Laboratorio',
-      description: 'Experto en formulación, limpieza, alimentos y laboratorio',
-      instructions: 'Eres un experto en formulación, productos de limpieza, alimentos y análisis de laboratorio.',
-      icon: '🧪',
+      id: 'gpt4',
+      name: 'ChatGPT 4.0 - Buscador Principal',
+      description: 'Buscador inteligente con ChatGPT 4.0 para consultas especializadas',
+      instructions: 'Eres un asistente especializado con acceso a ChatGPT 4.0. Respondes consultas técnicas y especializadas de manera precisa y profesional.',
+      icon: '🔍',
       isDefault: true
-    },
-    {
-      id: 'cleaner',
-      name: 'Productos de Limpieza',
-      description: 'Especializado en detergentes y productos de limpieza',
-      instructions: 'Eres un especialista en productos de limpieza, detergentes, desinfectantes y química del hogar.',
-      icon: '🧽'
-    },
-    {
-      id: 'food',
-      name: 'Industria Alimentaria',
-      description: 'Experto en seguridad alimentaria y procesos',
-      instructions: 'Eres un experto en seguridad alimentaria, procesos de conservación y tecnología de alimentos.',
-      icon: '🍎'
     }
   ];
 
@@ -162,6 +148,58 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
     setAttachments(prev => prev.filter(att => att.id !== id));
   };
 
+  // Función para copiar conversación
+  const copyConversation = () => {
+    const conversationText = messages.map(msg => 
+      `${msg.type === 'user' ? 'Usuario' : 'Asistente'}: ${msg.content}`
+    ).join('\n\n');
+    
+    navigator.clipboard.writeText(conversationText).then(() => {
+      toast({
+        title: "Copiado",
+        description: "La conversación se ha copiado al portapapeles.",
+      });
+    }).catch(() => {
+      toast({
+        title: "Error",
+        description: "No se pudo copiar la conversación.",
+        variant: "destructive"
+      });
+    });
+  };
+
+  // Función para descargar historial
+  const downloadHistory = (format: 'txt' | 'docx' | 'pdf') => {
+    const historial = JSON.parse(localStorage.getItem("historialGPT") || "[]");
+    
+    if (format === 'txt') {
+      const content = historial.map((item: any) => 
+        `Fecha: ${item.fecha}\nGPT: ${item.gptUsado}\nPregunta: ${item.pregunta}\nRespuesta: ${item.respuesta}\n\n${'='.repeat(50)}\n\n`
+      ).join('');
+      
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `historial_gpt_${new Date().toISOString().split('T')[0]}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Descarga completada",
+        description: "El historial se ha descargado como archivo .txt",
+      });
+    } else {
+      toast({
+        title: "Formato no disponible",
+        description: `La descarga en formato ${format.toUpperCase()} estará disponible próximamente.`,
+        variant: "destructive"
+      });
+    }
+  };
+
   // Crear nuevo GPT
   const createCustomGPT = () => {
     if (!newGPTName.trim() || !newGPTInstructions.trim()) {
@@ -231,7 +269,7 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   return (
     <div className="min-h-screen bg-background font-montserrat flex">
       {/* Sidebar con historial */}
-      <div className="w-80 bg-card border-r border-border p-4">
+      <div className="w-80 bg-card border-r border-border p-4 flex flex-col">
         <div className="flex items-center justify-between mb-6">
           <h3 className="font-semibold text-foreground">Historial</h3>
           <Button
@@ -243,7 +281,7 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
             <Settings className="h-4 w-4" />
           </Button>
         </div>
-        <ScrollArea className="h-[calc(100vh-180px)]">
+        <ScrollArea className="h-[calc(50vh-120px)] flex-shrink-0">
           <div className="space-y-2">
             {historialBusquedas.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
@@ -259,13 +297,37 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
           </div>
         </ScrollArea>
         
+        {/* GPTs Personalizados */}
+        {customGPTs.length > 0 && (
+          <div className="mb-4">
+            <h4 className="text-sm font-medium text-foreground mb-2">Mis GPTs</h4>
+            <div className="space-y-2">
+              {customGPTs.map((gpt) => (
+                <Button
+                  key={gpt.id}
+                  variant={selectedGPT === gpt.id ? "default" : "outline"}
+                  size="sm"
+                  className="w-full justify-start text-left"
+                  onClick={() => setSelectedGPT(gpt.id)}
+                >
+                  <span className="mr-2">{gpt.icon}</span>
+                  <div className="text-left">
+                    <div className="font-medium text-xs">{gpt.name}</div>
+                    <div className="text-xs text-muted-foreground line-clamp-1">{gpt.description}</div>
+                  </div>
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Botón limpiar historial */}
         <div className="mt-4 pt-4 border-t border-border">
           <Button
             onClick={clearHistory}
             variant="outline"
             size="sm"
-            className="w-full text-destructive hover:text-destructive"
+            className="w-full bg-green-50 border-green-200 text-green-700 hover:bg-green-100 hover:text-green-800 hover:border-green-300"
             disabled={historialBusquedas.length === 0}
           >
             <Trash2 className="h-4 w-4 mr-2" />
@@ -277,16 +339,18 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
       {/* Área principal del chat */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="bg-card border-b border-border p-6">
-          <h1 className="text-2xl font-bold text-foreground mb-2">
-            Buscador GPT – Tu copiloto para formulación, limpieza, alimentos y laboratorio
-          </h1>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <span className="text-lg">🔐</span>
-            <p className="text-sm font-semibold">
-              Tu historial se guarda localmente en tu navegador. Máximo 50 búsquedas por seguridad. Puedes descargar conversaciones importantes.
-            </p>
+        <div className="bg-card border-b border-border p-6 text-center">
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
+              <span className="text-2xl">🔍</span>
+            </div>
+            <h1 className="text-3xl font-bold text-foreground">
+              Buscador GPT
+            </h1>
           </div>
+          <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
+            Potenciado por ChatGPT 4.0 • Tu historial se guarda localmente por seguridad • Máximo 50 búsquedas
+          </p>
         </div>
 
         {/* Área de mensajes */}
@@ -448,29 +512,41 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
 
             {/* Botones de acción */}
             <div className="flex flex-wrap gap-2 justify-center">
-              <Button variant="outline" size="sm" className="rounded-[20px]">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="rounded-[20px]"
+                onClick={copyConversation}
+              >
                 <Copy className="h-4 w-4 mr-2" />
                 Copiar
               </Button>
-              <Button variant="outline" size="sm" className="rounded-[20px]">
-                <Edit className="h-4 w-4 mr-2" />
-                Editar
-              </Button>
-              <Button variant="outline" size="sm" className="rounded-[20px]">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="rounded-[20px]"
+                onClick={() => downloadHistory('txt')}
+              >
                 <Download className="h-4 w-4 mr-2" />
                 Guardar como .txt
               </Button>
-              <Button variant="outline" size="sm" className="rounded-[20px]">
-                <Download className="h-4 w-4 mr-2" />
-                Guardar como .pdf
-              </Button>
-              <Button variant="outline" size="sm" className="rounded-[20px]">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="rounded-[20px]"
+                onClick={() => downloadHistory('docx')}
+              >
                 <Download className="h-4 w-4 mr-2" />
                 Guardar como .docx
               </Button>
-              <Button variant="outline" size="sm" className="rounded-[20px]">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="rounded-[20px]"
+                onClick={() => downloadHistory('pdf')}
+              >
                 <Download className="h-4 w-4 mr-2" />
-                Guardar como .ppt
+                Guardar como .pdf
               </Button>
             </div>
 
