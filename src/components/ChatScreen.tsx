@@ -52,6 +52,8 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   const [newGPTName, setNewGPTName] = useState('');
   const [newGPTDescription, setNewGPTDescription] = useState('');
   const [newGPTInstructions, setNewGPTInstructions] = useState('');
+  const [testInput, setTestInput] = useState('');
+  const [testOutput, setTestOutput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -226,6 +228,8 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
     setNewGPTName('');
     setNewGPTDescription('');
     setNewGPTInstructions('');
+    setTestInput('');
+    setTestOutput('');
     setIsCreatingGPT(false);
 
     toast({
@@ -444,43 +448,117 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
                     Crear GPT
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[600px]">
+                <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Crear GPT Personalizado</DialogTitle>
                   </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium">Nombre *</label>
-                      <Input
-                        value={newGPTName}
-                        onChange={(e) => setNewGPTName(e.target.value)}
-                        placeholder="Ej: Experto en Cosméticos"
-                      />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Panel de configuración */}
+                    <div className="space-y-4">
+                      <h3 className="font-medium text-lg">Configuración</h3>
+                      <div>
+                        <label className="text-sm font-medium">Nombre *</label>
+                        <Input
+                          value={newGPTName}
+                          onChange={(e) => setNewGPTName(e.target.value)}
+                          placeholder="Ej: Experto en Cosméticos"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Descripción</label>
+                        <Input
+                          value={newGPTDescription}
+                          onChange={(e) => setNewGPTDescription(e.target.value)}
+                          placeholder="Breve descripción del GPT"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Instrucciones *</label>
+                        <Textarea
+                          value={newGPTInstructions}
+                          onChange={(e) => setNewGPTInstructions(e.target.value)}
+                          placeholder="Define el comportamiento y especialización del GPT..."
+                          rows={6}
+                        />
+                      </div>
+                      
+                      {/* Área de archivos */}
+                      <div>
+                        <label className="text-sm font-medium">Archivos de entrenamiento</label>
+                        <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center">
+                          <Paperclip className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">
+                            Arrastra archivos aquí o haz clic para subir
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Soporta: PDF, DOC, TXT, imágenes
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => {
+                          setNewGPTName('');
+                          setNewGPTDescription('');
+                          setNewGPTInstructions('');
+                          setTestInput('');
+                          setTestOutput('');
+                          setIsCreatingGPT(false);
+                        }} className="flex-1">
+                          Cancelar
+                        </Button>
+                        <Button onClick={createCustomGPT} className="flex-1">
+                          Crear GPT
+                        </Button>
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-sm font-medium">Descripción</label>
-                      <Input
-                        value={newGPTDescription}
-                        onChange={(e) => setNewGPTDescription(e.target.value)}
-                        placeholder="Breve descripción del GPT"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Instrucciones *</label>
-                      <Textarea
-                        value={newGPTInstructions}
-                        onChange={(e) => setNewGPTInstructions(e.target.value)}
-                        placeholder="Define el comportamiento y especialización del GPT..."
-                        rows={4}
-                      />
-                    </div>
-                    <div className="flex gap-2 justify-end">
-                      <Button variant="outline" onClick={() => setIsCreatingGPT(false)}>
-                        Cancelar
-                      </Button>
-                      <Button onClick={createCustomGPT}>
-                        Crear GPT
-                      </Button>
+                    
+                    {/* Panel de pruebas */}
+                    <div className="space-y-4">
+                      <h3 className="font-medium text-lg">Probar funcionalidad</h3>
+                      <div>
+                        <label className="text-sm font-medium">Pregunta de prueba</label>
+                        <Textarea
+                          value={testInput}
+                          onChange={(e) => setTestInput(e.target.value)}
+                          placeholder="Escribe una pregunta para probar cómo respondería tu GPT..."
+                          rows={3}
+                        />
+                        <Button 
+                          size="sm" 
+                          className="mt-2 w-full"
+                          onClick={() => {
+                            if (testInput.trim() && newGPTInstructions.trim()) {
+                              setTestOutput(`GPT responde basado en: "${newGPTInstructions}"\n\nPregunta: ${testInput}\n\nRespuesta simulada: Esta sería la respuesta de tu GPT personalizado. En el entorno real, utilizaría las instrucciones proporcionadas para generar una respuesta especializada.`);
+                            } else {
+                              toast({
+                                title: "Error",
+                                description: "Agrega instrucciones y una pregunta de prueba",
+                                variant: "destructive"
+                              });
+                            }
+                          }}
+                        >
+                          Probar respuesta
+                        </Button>
+                      </div>
+                      
+                      <div>
+                        <label className="text-sm font-medium">Vista previa de respuesta</label>
+                        <Textarea
+                          value={testOutput}
+                          readOnly
+                          placeholder="Aquí aparecerá la respuesta de prueba de tu GPT..."
+                          rows={8}
+                          className="bg-muted/50"
+                        />
+                      </div>
+                      
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-sm text-blue-800">
+                          💡 <strong>Consejo:</strong> Refina las instrucciones hasta que las respuestas de prueba sean las que esperas.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </DialogContent>
