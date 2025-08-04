@@ -70,15 +70,15 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
 
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4 font-montserrat">
-      {/* Fondo blanco con franjas verdes y grises */}
+      {/* Fondo inspirado en la plantilla de marca con franjas dinámicas */}
       <div className="absolute inset-0 bg-white">
-        {/* Franjas curvas verdes y grises */}
         <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-br from-green-500/20 to-green-600/10 rounded-full blur-3xl transform -translate-x-48 -translate-y-48"></div>
-          <div className="absolute top-1/4 right-0 w-80 h-80 bg-gradient-to-bl from-gray-300/30 to-gray-400/10 rounded-full blur-2xl transform translate-x-40"></div>
-          <div className="absolute bottom-0 left-1/4 w-72 h-72 bg-gradient-to-tr from-green-400/25 to-emerald-500/15 rounded-full blur-3xl transform translate-y-36"></div>
-          <div className="absolute bottom-1/4 right-1/3 w-64 h-64 bg-gradient-to-tl from-gray-200/40 to-green-300/20 rounded-full blur-2xl"></div>
-          <div className="absolute top-1/2 left-0 w-56 h-56 bg-gradient-to-r from-green-600/15 to-transparent rounded-full blur-2xl transform -translate-x-28"></div>
+          <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-br from-[#a7db74]/20 via-[#a7db74]/10 to-transparent transform -rotate-12 origin-top-left"></div>
+          <div className="absolute top-20 right-0 w-96 h-96 bg-gradient-to-bl from-gray-200/30 via-white/20 to-transparent rounded-full transform rotate-45"></div>
+          <div className="absolute bottom-0 left-0 w-full h-48 bg-gradient-to-tr from-[#a7db74]/15 via-transparent to-gray-100/30 transform skew-x-12"></div>
+          <div className="absolute top-1/3 right-1/4 w-32 h-32 bg-[#a7db74]/10 rounded-full blur-xl"></div>
+          <div className="absolute bottom-1/3 left-1/4 w-48 h-48 bg-gray-200/20 rounded-full blur-2xl"></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-gradient-radial from-[#a7db74]/5 to-transparent rounded-full"></div>
         </div>
       </div>
 
@@ -86,9 +86,15 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
       <div className="relative z-10 w-full max-w-md">
         <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
           <CardHeader className="text-center space-y-6 pb-8">
-            {/* Logo principal */}
-            <div className="mx-auto w-20 h-20 bg-gradient-to-br from-green-600 to-emerald-600 rounded-full flex items-center justify-center shadow-lg">
-              <span className="text-3xl font-bold text-white">🔍</span>
+            {/* Logo principal con el símbolo de hoja de Ingtec */}
+            <div className="mx-auto w-20 h-20 bg-gradient-to-br from-[#a7db74] to-[#a7db74] rounded-full flex items-center justify-center shadow-lg">
+              <svg className="w-10 h-10 text-white" viewBox="0 0 100 100" fill="currentColor">
+                <circle cx="50" cy="50" r="45" fill="currentColor" opacity="0.1"/>
+                <path d="M50 15 C35 20, 25 35, 25 50 C25 65, 35 80, 50 85 C65 80, 75 65, 75 50 C75 35, 65 20, 50 15 Z" fill="currentColor"/>
+                <path d="M50 25 L45 35 L35 40 L45 45 L50 55 L55 45 L65 40 L55 35 Z" fill="white" opacity="0.8"/>
+                <path d="M30 45 Q50 35, 70 45" stroke="white" strokeWidth="2" fill="none" opacity="0.6"/>
+                <path d="M30 55 Q50 65, 70 55" stroke="white" strokeWidth="2" fill="none" opacity="0.6"/>
+              </svg>
             </div>
             
             {/* Título principal */}
@@ -96,7 +102,7 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
               <h1 className="text-3xl font-bold text-gray-800 leading-tight">
                 Buscador GPT
               </h1>
-              <h2 className="text-lg font-semibold text-green-700">
+              <h2 className="text-lg font-semibold" style={{ color: '#a7db74' }}>
                 Ingtec Especialidades
               </h2>
               <p className="text-sm text-gray-600 font-medium">
@@ -106,8 +112,8 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
           </CardHeader>
           
           <CardContent className="space-y-6 pt-0">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <CardDescription className="text-center text-green-800 leading-relaxed text-sm">
+            <div className="border rounded-lg p-4" style={{ backgroundColor: '#a7db74' + '10', borderColor: '#a7db74' + '40' }}>
+              <CardDescription className="text-center leading-relaxed text-sm" style={{ color: '#a7db74' }}>
                 <span className="inline-block mr-2">🔐</span>
                 <strong>Acceso exclusivo para colaboradores</strong><br/>
                 Solo cuentas @iespecialidades.com autorizadas.<br/>
@@ -127,7 +133,7 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
               
               <Button 
                 onClick={handleLogin}
-                className="w-full h-14 rounded-[20px] bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                className="w-full h-14 rounded-[20px] bg-gradient-to-r from-[#a7db74] to-[#a7db74] hover:from-[#a7db74]/80 hover:to-[#a7db74]/80 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
               >
                 <span className="mr-2">✓</span>
                 Validar identidad y acceder
