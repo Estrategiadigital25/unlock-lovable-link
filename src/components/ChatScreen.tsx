@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Download, Copy, Edit, Settings, Plus, Paperclip, Image, FileText, Trash2, Bot, User } from "lucide-react";
+import jsPDF from 'jspdf';
+import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { useToast } from "@/components/ui/use-toast";
 
 interface ChatScreenProps {
@@ -171,7 +173,7 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   };
 
   // Función para descargar historial
-  const downloadHistory = (format: 'txt' | 'docx' | 'pdf') => {
+  const downloadHistory = async (format: 'txt' | 'docx' | 'pdf') => {
     const historial = JSON.parse(localStorage.getItem("historialGPT") || "[]");
     
     if (format === 'txt') {
@@ -193,12 +195,108 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
         title: "Descarga completada",
         description: "El historial se ha descargado como archivo .txt",
       });
-    } else {
-      toast({
-        title: "Formato no disponible",
-        description: `La descarga en formato ${format.toUpperCase()} estará disponible próximamente.`,
-        variant: "destructive"
-      });
+    } else if (format === 'docx') {
+      try {
+        const children = historial.flatMap((item: any) => [
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Fecha: ${item.fecha}`, bold: true }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `GPT: ${item.gptUsado}`, bold: true }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Pregunta: ${item.pregunta}` }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Respuesta: ${item.respuesta}` }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({ text: "".padEnd(50, "=") }),
+          new Paragraph({ text: "" }),
+        ]);
+
+        const doc = new Document({
+          sections: [{
+            properties: {},
+            children: children,
+          }],
+        });
+
+        const buffer = await Packer.toBuffer(doc);
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `historial_gpt_${new Date().toISOString().split('T')[0]}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        toast({
+          title: "Descarga completada",
+          description: "El historial se ha descargado como archivo .docx",
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "No se pudo generar el archivo .docx",
+          variant: "destructive"
+        });
+      }
+    } else if (format === 'pdf') {
+      try {
+        const pdf = new jsPDF();
+        let yPosition = 20;
+        
+        historial.forEach((item: any, index: number) => {
+          if (yPosition > 280) {
+            pdf.addPage();
+            yPosition = 20;
+          }
+          
+          pdf.setFontSize(12);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(`Fecha: ${item.fecha}`, 10, yPosition);
+          yPosition += 10;
+          
+          pdf.text(`GPT: ${item.gptUsado}`, 10, yPosition);
+          yPosition += 10;
+          
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(`Pregunta: ${item.pregunta}`, 10, yPosition);
+          yPosition += 10;
+          
+          pdf.text(`Respuesta: ${item.respuesta}`, 10, yPosition);
+          yPosition += 20;
+          
+          if (index < historial.length - 1) {
+            pdf.text(''.padEnd(50, '='), 10, yPosition);
+            yPosition += 10;
+          }
+        });
+        
+        pdf.save(`historial_gpt_${new Date().toISOString().split('T')[0]}.pdf`);
+        
+        toast({
+          title: "Descarga completada",
+          description: "El historial se ha descargado como archivo .pdf",
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "No se pudo generar el archivo .pdf",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -353,7 +451,7 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
             </h1>
           </div>
           <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
-            Potenciado por ChatGPT 4.0 • Tu historial se guarda localmente por seguridad • Máximo 50 búsquedas
+            Potenciado por ChatGPT 4.0 • Cuenta AWS: 1000 búsquedas diarias • 50MB de espacio • Historial local seguro
           </p>
         </div>
 
