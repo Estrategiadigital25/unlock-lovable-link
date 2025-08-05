@@ -429,7 +429,8 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
             onClick={clearHistory}
             variant="outline"
             size="sm"
-            className="w-full bg-green-50 border-green-200 text-green-700 hover:bg-green-100 hover:text-green-800 hover:border-green-300"
+            className="w-full border-2 text-white hover:opacity-90"
+            style={{ backgroundColor: '#a7db74', borderColor: '#a7db74' }}
             disabled={historialBusquedas.length === 0}
           >
             <Trash2 className="h-4 w-4 mr-2" />
@@ -444,7 +445,7 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
         <div className="bg-card border-b border-border p-6 text-center">
           <div className="flex items-center justify-center gap-3 mb-2">
             <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-              <img src="/src/assets/ingtec-leaf-simple.png" alt="Ingtec Logo" className="w-8 h-8" />
+              <img src="/src/assets/ingtec-leaf-logo.png" alt="Ingtec Logo" className="w-8 h-8" />
             </div>
             <h1 className="text-3xl font-bold text-foreground">
               Buscador GPT
