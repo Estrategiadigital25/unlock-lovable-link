@@ -405,19 +405,92 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
             <h4 className="text-sm font-medium text-foreground mb-2">Mis GPTs</h4>
             <div className="space-y-2">
               {customGPTs.map((gpt) => (
-                <Button
-                  key={gpt.id}
-                  variant={selectedGPT === gpt.id ? "default" : "outline"}
-                  size="sm"
-                  className="w-full justify-start text-left"
-                  onClick={() => setSelectedGPT(gpt.id)}
-                >
-                  <span className="mr-2">{gpt.icon}</span>
-                  <div className="text-left">
-                    <div className="font-medium text-xs">{gpt.name}</div>
-                    <div className="text-xs text-muted-foreground line-clamp-1">{gpt.description}</div>
-                  </div>
-                </Button>
+                <div key={gpt.id} className="flex items-center gap-2">
+                  <Button
+                    variant={selectedGPT === gpt.id ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1 justify-start text-left"
+                    onClick={() => setSelectedGPT(gpt.id)}
+                  >
+                    <span className="mr-2">{gpt.icon}</span>
+                    <div className="text-left">
+                      <div className="font-medium text-xs">{gpt.name}</div>
+                      <div className="text-xs text-muted-foreground line-clamp-1">{gpt.description}</div>
+                    </div>
+                  </Button>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Editar GPT</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium">Nombre</label>
+                          <Input 
+                            defaultValue={gpt.name}
+                            onChange={(e) => {
+                              const updatedGPTs = customGPTs.map(g => 
+                                g.id === gpt.id ? { ...g, name: e.target.value } : g
+                              );
+                              setCustomGPTs(updatedGPTs);
+                              localStorage.setItem('custom_gpts', JSON.stringify(updatedGPTs));
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium">Descripción</label>
+                          <Input 
+                            defaultValue={gpt.description}
+                            onChange={(e) => {
+                              const updatedGPTs = customGPTs.map(g => 
+                                g.id === gpt.id ? { ...g, description: e.target.value } : g
+                              );
+                              setCustomGPTs(updatedGPTs);
+                              localStorage.setItem('custom_gpts', JSON.stringify(updatedGPTs));
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium">Instrucciones</label>
+                          <Textarea 
+                            defaultValue={gpt.instructions}
+                            onChange={(e) => {
+                              const updatedGPTs = customGPTs.map(g => 
+                                g.id === gpt.id ? { ...g, instructions: e.target.value } : g
+                              );
+                              setCustomGPTs(updatedGPTs);
+                              localStorage.setItem('custom_gpts', JSON.stringify(updatedGPTs));
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                    onClick={() => {
+                      const updatedGPTs = customGPTs.filter(g => g.id !== gpt.id);
+                      setCustomGPTs(updatedGPTs);
+                      localStorage.setItem('custom_gpts', JSON.stringify(updatedGPTs));
+                      if (selectedGPT === gpt.id) {
+                        setSelectedGPT('gpt4');
+                      }
+                      toast({
+                        title: "GPT eliminado",
+                        description: `Se ha eliminado el GPT "${gpt.name}".`,
+                      });
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
               ))}
             </div>
           </div>
