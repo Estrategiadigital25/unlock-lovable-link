@@ -87,8 +87,8 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
         <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
           <CardHeader className="text-center space-y-6 pb-8">
             {/* Logo principal con el símbolo de hoja de Ingtec */}
-            <div className="mx-auto w-20 h-20 bg-gradient-to-br from-[#a7db74] to-[#a7db74] rounded-full flex items-center justify-center shadow-lg">
-              <img src="/src/assets/ingtec-leaf-logo.png" alt="Ingtec Logo" className="w-12 h-12" />
+            <div className="mx-auto">
+              <img src="/src/assets/ingtec-leaf-new.png" alt="Ingtec Logo" className="w-20 h-20" />
             </div>
             
             {/* Título principal */}
