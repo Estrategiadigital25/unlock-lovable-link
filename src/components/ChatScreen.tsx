@@ -518,7 +518,7 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
         <div className="bg-card border-b border-border p-6 text-center">
           <div className="flex items-center justify-center gap-3 mb-2">
             <div>
-              <img src="/src/assets/ingtec-leaf-new.png" alt="Ingtec Logo" className="w-12 h-12" />
+              <img src="/lovable-uploads/4c7e0a4b-080a-437a-b8e8-bb34ebe70495.png" alt="Ingtec Logo" className="w-12 h-12" />
             </div>
             <h1 className="text-3xl font-bold text-foreground">
               Buscador GPT
