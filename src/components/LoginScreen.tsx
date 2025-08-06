@@ -41,7 +41,9 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
     'laboratorio8@iespecialidades.com',
     'auxiliaradministrativa@iespecialidades.com',
     'wilmer.pinzon@iespecialidades.com',
-    'liderformuladores@iespecialidades.com'
+    'liderformuladores@iespecialidades.com',
+    'lorena.hurtado@iespecialidades.com',
+    'prueba@iespecialidades.com'
   ];
 
   const handleLogin = () => {
