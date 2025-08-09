@@ -12,6 +12,7 @@ import { Download, Copy, Edit, Settings, Plus, Paperclip, Image, FileText, Trash
 import jsPDF from 'jspdf';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { useToast } from "@/components/ui/use-toast";
+import { optimizePrompt, detectMode, type Mode, type TargetIA } from "@/lib/promptOptimizer";
 
 interface ChatScreenProps {
   onAdminPanel: () => void;
@@ -56,6 +57,8 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   const [newGPTInstructions, setNewGPTInstructions] = useState('');
   const [testInput, setTestInput] = useState('');
   const [testOutput, setTestOutput] = useState('');
+  const [targetIA, setTargetIA] = useState<TargetIA>('ChatGPT');
+  const [mode, setMode] = useState<Mode>('AUTO');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -339,33 +342,33 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   const handleSendMessage = () => {
     if (!inputValue.trim()) return;
 
-    const currentGPT = [...defaultGPTs, ...customGPTs].find(gpt => gpt.id === selectedGPT);
-
-    const newMessage: Message = {
+    const userMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
       content: inputValue,
       timestamp: new Date(),
       attachments: attachments.length > 0 ? [...attachments] : undefined,
-      gptUsed: currentGPT?.name
+      gptUsed: 'Usuario'
     };
 
-    setMessages(prev => [...prev, newMessage]);
-    saveToHistory(inputValue);
+    setMessages(prev => [...prev, userMessage]);
+
+    // No guardar en historial local: "Nota de memoria: No guardar ninguna información de las sesiones de optimización"
     setInputValue('');
     setAttachments([]);
 
-    // Simular respuesta del asistente
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: `Respuesta del ${currentGPT?.name}: ${currentGPT?.instructions || 'Sistema base'}\n\nEsta es una respuesta simulada. En un entorno real, aquí se mostraría la respuesta generada por el modelo especializado.`,
-        timestamp: new Date(),
-        gptUsed: currentGPT?.name
-      };
-      setMessages(prev => [...prev, assistantMessage]);
-    }, 1000);
+    const finalMode = mode === 'AUTO' ? detectMode(userMessage.content) : mode;
+    const formatted = optimizePrompt(userMessage.content, targetIA, finalMode);
+
+    const assistantMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      type: 'assistant',
+      content: `Modo: ${finalMode} • IA objetivo: ${targetIA}\n\n${formatted}`,
+      timestamp: new Date(),
+      gptUsed: 'Asistente Ingtec'
+    };
+
+    setMessages(prev => [...prev, assistantMessage]);
   };
 
   return (
@@ -736,6 +739,39 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
                 </DialogContent>
               </Dialog>
             </div>
+
+            {/* Controles Asistente Ingtec */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+              <div>
+                <label className="text-sm font-medium">IA objetivo</label>
+                <Select value={targetIA} onValueChange={(v) => setTargetIA(v as TargetIA)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecciona IA objetivo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ChatGPT">ChatGPT</SelectItem>
+                    <SelectItem value="Claude">Claude</SelectItem>
+                    <SelectItem value="Gemini">Gemini</SelectItem>
+                    <SelectItem value="Otro">Otro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Modo</label>
+                <Select value={mode} onValueChange={(v) => setMode(v as Mode)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Modo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AUTO">AUTO (detección automática)</SelectItem>
+                    <SelectItem value="DETALLE">DETALLE</SelectItem>
+                    <SelectItem value="BÁSICO">BÁSICO</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Archivos adjuntos */}
 
             {/* Archivos adjuntos */}
             {attachments.length > 0 && (
