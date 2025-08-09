@@ -66,9 +66,9 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   const defaultGPTs: CustomGPT[] = [
     {
       id: 'gpt4',
-      name: 'ChatGPT 4.0 - Buscador Principal',
-      description: 'Buscador inteligente con ChatGPT 4.0 para consultas especializadas',
-      instructions: 'Eres un asistente especializado con acceso a ChatGPT 4.0. Respondes consultas técnicas y especializadas de manera precisa y profesional.',
+      name: 'ChatGPT — Buscador Principal',
+      description: 'Buscador inteligente con ChatGPT (última versión) para consultas especializadas',
+      instructions: 'Eres un asistente especializado con acceso a ChatGPT (última versión). Respondes consultas técnicas y especializadas de manera precisa y profesional.',
       icon: '🔍',
       isDefault: true
     }
@@ -526,6 +526,9 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
             <h1 className="text-3xl font-bold text-foreground">
               Buscador GPT
             </h1>
+          </div>
+          <div className="mb-2">
+            <Badge variant="secondary">Respaldado por la última versión de ChatGPT</Badge>
           </div>
           <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
             Límite por usuario: 35 búsquedas diarias • 1.8MB de espacio • Las búsquedas se pueden guardar para no perder el historial
