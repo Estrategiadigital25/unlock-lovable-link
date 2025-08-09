@@ -102,7 +102,7 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
                 Ingtec Especialidades
               </h2>
               <p className="text-sm text-gray-600 font-medium">
-                Potenciado por ChatGPT 4.0
+                Respaldado por la última versión de ChatGPT
               </p>
             </div>
           </CardHeader>

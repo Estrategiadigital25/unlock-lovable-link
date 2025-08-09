@@ -12,7 +12,7 @@ import { Download, Copy, Edit, Settings, Plus, Paperclip, Image, FileText, Trash
 import jsPDF from 'jspdf';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { useToast } from "@/components/ui/use-toast";
-import { optimizePrompt, detectMode, type Mode, type TargetIA } from "@/lib/promptOptimizer";
+import { optimizePrompt, detectMode, type Mode } from "@/lib/promptOptimizer";
 
 interface ChatScreenProps {
   onAdminPanel: () => void;
@@ -57,7 +57,7 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   const [newGPTInstructions, setNewGPTInstructions] = useState('');
   const [testInput, setTestInput] = useState('');
   const [testOutput, setTestOutput] = useState('');
-  const [targetIA, setTargetIA] = useState<TargetIA>('ChatGPT');
+  
   const [mode, setMode] = useState<Mode>('AUTO');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -358,12 +358,12 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
     setAttachments([]);
 
     const finalMode = mode === 'AUTO' ? detectMode(userMessage.content) : mode;
-    const formatted = optimizePrompt(userMessage.content, targetIA, finalMode);
+    const formatted = optimizePrompt(userMessage.content, "ChatGPT", finalMode);
 
     const assistantMessage: Message = {
       id: (Date.now() + 1).toString(),
       type: 'assistant',
-      content: `Modo: ${finalMode} • IA objetivo: ${targetIA}\n\n${formatted}`,
+      content: `Modo: ${finalMode}\n\n${formatted}`,
       timestamp: new Date(),
       gptUsed: 'Asistente Ingtec'
     };
@@ -745,20 +745,6 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
 
             {/* Controles Asistente Ingtec */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-              <div>
-                <label className="text-sm font-medium">IA objetivo</label>
-                <Select value={targetIA} onValueChange={(v) => setTargetIA(v as TargetIA)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecciona IA objetivo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ChatGPT">ChatGPT</SelectItem>
-                    <SelectItem value="Claude">Claude</SelectItem>
-                    <SelectItem value="Gemini">Gemini</SelectItem>
-                    <SelectItem value="Otro">Otro</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
               <div>
                 <label className="text-sm font-medium">Modo</label>
                 <Select value={mode} onValueChange={(v) => setMode(v as Mode)}>
