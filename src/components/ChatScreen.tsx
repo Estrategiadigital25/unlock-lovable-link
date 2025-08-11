@@ -59,6 +59,7 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   const [testOutput, setTestOutput] = useState('');
   
   const [mode, setMode] = useState<Mode>('AUTO');
+  const [isNewChatOpen, setIsNewChatOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -96,6 +97,26 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
       }
     }
   }, []);
+
+  const handleLogout = () => {
+    // Solo limpiar datos de la sesión actual
+    setMessages([]);
+    setAttachments([]);
+    setInputValue('');
+    setMode('AUTO');
+  };
+
+  const handleNewSearch = () => {
+    setMessages([]);
+    setAttachments([]);
+    setInputValue('');
+    setMode('AUTO');
+    setIsNewChatOpen(false);
+    toast({
+      title: "Nueva búsqueda iniciada",
+      description: "El chat ha sido limpiado para empezar una nueva conversación.",
+    });
+  };
 
   // Guardar historial en localStorage con estructura mejorada
   const saveToHistory = (query: string, response?: string) => {
@@ -823,6 +844,21 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
               >
                 <Download className="h-4 w-4 mr-2" />
                 Guardar como .pdf
+              </Button>
+            </div>
+
+            <Separator />
+
+            {/* Botón Nueva búsqueda */}
+            <div className="flex justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNewSearch}
+                className="flex items-center gap-2 rounded-[20px]"
+              >
+                <Plus className="h-4 w-4" />
+                Nueva búsqueda
               </Button>
             </div>
 
