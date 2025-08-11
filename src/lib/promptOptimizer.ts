@@ -57,33 +57,93 @@ export function optimizePrompt(input: string, target: TargetIA, mode: Mode): str
   }
 
   const finalMode: Exclude<Mode, "AUTO" | "SIN ASISTENTE"> = mode === "AUTO" ? detectMode(input) : mode as Exclude<Mode, "AUTO" | "SIN ASISTENTE">;
-  const optimized = buildOptimizedPrompt(input, target, finalMode);
-
+  
+  // Para modos con asistente, generar respuesta directa
   if (finalMode === "CON ASISTENTE BÁSICO") {
-    return [
-      "Tu prompt optimizado:",
-      optimized,
-      "",
-      "Qué cambió:",
-      "• Se definió un rol claro y el objetivo.",
-      "• Se estructuró el formato de salida y el tono.",
-      "• Se indicaron supuestos/validaciones y se redujo la ambigüedad.",
-    ].join("\n");
+    return generateDirectResponse(input, "básico");
+  } else if (finalMode === "CON ASISTENTE DETALLADO") {
+    return generateDirectResponse(input, "detallado");
   }
 
-  // CON ASISTENTE DETALLADO
-  return [
-    "Tu prompt optimizado:",
-    optimized,
-    "",
-    "Mejoras clave:",
-    "• Rol y objetivo explícitos para reducir desviaciones.",
-    "• Estructura 4-D para mayor claridad y completitud.",
-    "• Especificaciones de salida con validación de supuestos.",
-    "• Preparado para ejemplos de pocos disparos y cadena de pensamiento resumida.",
-    "",
-    "Técnicas aplicadas: Asignación de rol, capas de contexto, especificaciones de salida, descomposición de tareas, (opcional) cadena de pensamiento y pocos disparos.",
-    "",
-    "Consejo profesional: Ajusta el nivel de detalle y agrega 1-2 ejemplos reales del contexto cuando busques consistencia en el estilo o formato.",
-  ].join("\n");
+  return input.trim();
+}
+
+function generateDirectResponse(input: string, level: "básico" | "detallado"): string {
+  const txt = input.toLowerCase();
+  
+  // Detectar tipo de consulta
+  if (txt.includes("formula") || txt.includes("fórmula")) {
+    if (level === "básico") {
+      return `Te ayudo a desarrollar una fórmula para limpiador. Para darte la mejor solución necesito conocer:
+
+**Información clave:**
+• ¿Qué tipo de superficies va a limpiar? (vidrio, pisos, baños, cocina, etc.)
+• ¿Prefieres ingredientes naturales o químicos comerciales?
+• ¿Tienes alguna restricción de ingredientes?
+
+**Mientras tanto, aquí tienes una fórmula básica universal:**
+- 500ml de agua destilada
+- 250ml de vinagre blanco
+- 2 cucharadas de bicarbonato de sodio
+- 10 gotas de aceite esencial (opcional, para aroma)
+
+¿Podrías especificar el uso específico para optimizar la fórmula?`;
+    } else {
+      return `Perfecto, te ayudo a desarrollar una fórmula de limpiador profesional. Necesito hacer un análisis completo:
+
+**Análisis de requerimientos:**
+1. **Tipo de limpiador**: ¿Desengrasante, desinfectante, multiusos, específico?
+2. **Superficies objetivo**: Detalles específicos del material a limpiar
+3. **Nivel de suciedad**: Ligera, moderada, pesada, grasa industrial
+4. **Restricciones**: Toxicidad, costo, disponibilidad de ingredientes
+5. **Volumen de producción**: Casero, pequeña escala, industrial
+
+**Formulación base recomendada:**
+- **Tensioactivos**: 5-15% (para reducir tensión superficial)
+- **Solventes**: 10-30% (isopropanol, etanol)
+- **Quelantes**: 0.1-1% (EDTA para dureza del agua)
+- **pH reguladores**: Según necesidad
+- **Agua**: Completar a 100%
+
+**Preguntas de profundización:**
+• ¿Qué presupuesto manejas por litro?
+• ¿Requiere certificaciones específicas?
+• ¿Tienes experiencia previa en formulación química?
+
+Con esta información podré diseñar la fórmula exacta y proceso de manufactura.`;
+    }
+  }
+  
+  // Respuesta genérica para otras consultas
+  if (level === "básico") {
+    return `Claro, te ayudo con tu consulta. Para darte la mejor respuesta necesito algunos detalles:
+
+**Información que me ayudaría:**
+• ¿Podrías ser más específico sobre lo que necesitas?
+• ¿Hay algún contexto particular o restricción?
+• ¿Qué nivel de detalle buscas en la respuesta?
+
+**Mientras tanto:** Basándome en tu consulta inicial, puedo ofrecerte una orientación general, pero con más detalles podré ser mucho más preciso y útil.
+
+¿Podrías ampliar un poco más tu solicitud?`;
+  } else {
+    return `Excelente consulta. Para proporcionarte una respuesta integral y estructurada, necesito hacer un análisis completo:
+
+**Metodología de análisis:**
+1. **Deconstrucción**: Identificar objetivos específicos y variables clave
+2. **Diagnóstico**: Evaluar el contexto y restricciones
+3. **Desarrollo**: Seleccionar el enfoque más efectivo
+4. **Entrega**: Solución estructurada y accionable
+
+**Información necesaria para optimizar mi respuesta:**
+• Contexto específico de tu situación
+• Objetivos principales y secundarios
+• Restricciones de tiempo, presupuesto o recursos
+• Nivel de experiencia en el tema
+• Resultados esperados
+
+**Enfoque inicial:** Basándome en tu consulta, puedo estructurar una respuesta preliminar, pero con los detalles adicionales podré ofrecerte un plan detallado con pasos específicos, consideraciones técnicas y recomendaciones profesionales.
+
+¿Podrías proporcionar estos detalles para desarrollar la solución más efectiva?`;
+  }
 }
