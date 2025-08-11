@@ -1,8 +1,8 @@
 export type TargetIA = "ChatGPT" | "Claude" | "Gemini" | "Otro";
-export type Mode = "AUTO" | "DETALLE" | "BÁSICO";
+export type Mode = "AUTO" | "CON ASISTENTE BÁSICO" | "CON ASISTENTE DETALLADO" | "SIN ASISTENTE";
 
 // Heurística simple para detectar complejidad del pedido
-export function detectMode(input: string): Exclude<Mode, "AUTO"> {
+export function detectMode(input: string): Exclude<Mode, "AUTO" | "SIN ASISTENTE"> {
   const txt = (input || "").toLowerCase();
   const long = txt.length > 400;
   const complexKeywords = [
@@ -11,7 +11,7 @@ export function detectMode(input: string): Exclude<Mode, "AUTO"> {
     "marco", "framework", "requisitos", "restricciones"
   ];
   const hasComplex = complexKeywords.some(k => txt.includes(k));
-  return (long || hasComplex) ? "DETALLE" : "BÁSICO";
+  return (long || hasComplex) ? "CON ASISTENTE DETALLADO" : "CON ASISTENTE BÁSICO";
 }
 
 function platformNote(target: TargetIA): string {
@@ -27,7 +27,7 @@ function platformNote(target: TargetIA): string {
   }
 }
 
-function buildOptimizedPrompt(userInput: string, target: TargetIA, mode: Exclude<Mode, "AUTO">): string {
+function buildOptimizedPrompt(userInput: string, target: TargetIA, mode: Exclude<Mode, "AUTO" | "SIN ASISTENTE">): string {
   // Prompt estructurado que el usuario puede copiar en la IA objetivo
   return [
     `Rol: Eres Asistente Ingtec, experta en optimización y resolución precisa.`,
@@ -44,17 +44,22 @@ function buildOptimizedPrompt(userInput: string, target: TargetIA, mode: Exclude
     "- Formato: pasos numerados, secciones, bullets concisos.",
     "- Tono: profesional y claro.",
     "- Validación: incluye supuestos si faltan datos y solicita 2-3 aclaraciones breves si es necesario.",
-    mode === "DETALLE"
+    mode === "CON ASISTENTE DETALLADO"
       ? "- Complejidad: permite cadena de pensamiento resumida y marcos sistemáticos."
       : "- Enfoque: solución directa y concisa.",
   ].join("\n");
 }
 
 export function optimizePrompt(input: string, target: TargetIA, mode: Mode): string {
-  const finalMode: Exclude<Mode, "AUTO"> = mode === "AUTO" ? detectMode(input) : mode;
+  // Si es sin asistente, devolver el input original sin optimización
+  if (mode === "SIN ASISTENTE") {
+    return input.trim();
+  }
+
+  const finalMode: Exclude<Mode, "AUTO" | "SIN ASISTENTE"> = mode === "AUTO" ? detectMode(input) : mode as Exclude<Mode, "AUTO" | "SIN ASISTENTE">;
   const optimized = buildOptimizedPrompt(input, target, finalMode);
 
-  if (finalMode === "BÁSICO") {
+  if (finalMode === "CON ASISTENTE BÁSICO") {
     return [
       "Tu prompt optimizado:",
       optimized,
@@ -66,7 +71,7 @@ export function optimizePrompt(input: string, target: TargetIA, mode: Mode): str
     ].join("\n");
   }
 
-  // DETALLE
+  // CON ASISTENTE DETALLADO
   return [
     "Tu prompt optimizado:",
     optimized,

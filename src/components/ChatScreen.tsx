@@ -363,9 +363,9 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
     const assistantMessage: Message = {
       id: (Date.now() + 1).toString(),
       type: 'assistant',
-      content: `Modo: ${finalMode}\n\n${formatted}`,
+      content: mode === 'SIN ASISTENTE' ? formatted : `Modo: ${finalMode}\n\n${formatted}`,
       timestamp: new Date(),
-      gptUsed: 'Asistente Ingtec'
+      gptUsed: mode === 'SIN ASISTENTE' ? 'ChatGPT' : 'Asistente Ingtec'
     };
 
     setMessages(prev => [...prev, assistantMessage]);
@@ -752,9 +752,10 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
                     <SelectValue placeholder="Modo" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="AUTO">AUTO (detección automática)</SelectItem>
-                    <SelectItem value="DETALLE">DETALLE</SelectItem>
-                    <SelectItem value="BÁSICO">BÁSICO</SelectItem>
+                    <SelectItem value="AUTO">AUTO</SelectItem>
+                    <SelectItem value="CON ASISTENTE BÁSICO">Con asistente básico</SelectItem>
+                    <SelectItem value="CON ASISTENTE DETALLADO">Con asistente detallado</SelectItem>
+                    <SelectItem value="SIN ASISTENTE">Sin asistente</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
