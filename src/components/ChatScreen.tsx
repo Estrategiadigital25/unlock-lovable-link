@@ -269,11 +269,23 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
 
   // Limpiar historial
   const clearHistory = () => {
+    // Limpiar conversaciones
+    setConversations([]);
+    localStorage.removeItem('conversations');
+    
+    // Limpiar historial antiguo
     setHistorialBusquedas([]);
     localStorage.removeItem("historialGPT");
+    
+    // Limpiar chat actual
+    setMessages([]);
+    setCurrentConversationId(null);
+    setAttachments([]);
+    setInputValue('');
+    
     toast({
       title: "Historial limpiado",
-      description: "Se ha eliminado todo el historial de búsquedas.",
+      description: "Se ha eliminado todo el historial de búsquedas y conversaciones.",
     });
   };
 
