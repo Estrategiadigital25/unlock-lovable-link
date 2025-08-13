@@ -343,20 +343,35 @@ useEffect(() => {
     });
   };
 
-  // Función para descargar historial
-  const downloadHistory = async (format: 'txt' | 'docx' | 'pdf') => {
-    const historial = JSON.parse(localStorage.getItem("historialGPT") || "[]");
+  // Función para descargar conversación actual
+  const downloadConversation = async (format: 'txt' | 'docx' | 'pdf') => {
+    if (messages.length === 0) {
+      toast({
+        title: "Aviso",
+        description: "No hay conversación para descargar",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const conversationData = {
+      fecha: new Date().toISOString().split('T')[0],
+      gptUsado: selectedGPT,
+      titulo: conversations.find(c => c.id === currentConversationId)?.title || 'Conversación actual',
+      mensajes: messages
+    };
     
     if (format === 'txt') {
-      const content = historial.map((item: any) => 
-        `Fecha: ${item.fecha}\nGPT: ${item.gptUsado}\nPregunta: ${item.pregunta}\nRespuesta: ${item.respuesta}\n\n${'='.repeat(50)}\n\n`
-      ).join('');
+      const content = `Fecha: ${conversationData.fecha}\nGPT: ${conversationData.gptUsado}\nTítulo: ${conversationData.titulo}\n\n${'='.repeat(50)}\n\n` +
+        messages.map(msg => 
+          `${msg.type === 'user' ? 'Usuario' : 'Asistente'}: ${msg.content}\n`
+        ).join('\n');
       
       const blob = new Blob([content], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `historial_gpt_${new Date().toISOString().split('T')[0]}.txt`;
+      a.download = `conversacion_${new Date().toISOString().split('T')[0]}.txt`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -364,58 +379,58 @@ useEffect(() => {
       
       toast({
         title: "Descarga completada",
-        description: "El historial se ha descargado como archivo .txt",
+        description: "La conversación se ha descargado como archivo .txt",
       });
     } else if (format === 'docx') {
       try {
         console.log('Iniciando generación de .docx...');
-        console.log('Historial cargado:', historial.length, 'elementos');
+        console.log('Mensajes en conversación:', messages.length);
         
-        if (historial.length === 0) {
-          toast({
-            title: "Aviso",
-            description: "No hay historial para descargar",
-            variant: "destructive"
-          });
-          return;
-        }
-
         // Crear contenido del documento
-        const children = historial.flatMap((item: any, index: number) => {
-          console.log(`Procesando elemento ${index + 1}:`, item);
-          
-          return [
+        const children = [
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Fecha: ${conversationData.fecha}`, bold: true }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `GPT: ${conversationData.gptUsado}`, bold: true }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Título: ${conversationData.titulo}`, bold: true }),
+            ],
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: "" })],
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: "=".repeat(50) })],
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: "" })],
+          }),
+          ...messages.flatMap((msg, index) => [
             new Paragraph({
               children: [
-                new TextRun({ text: `Fecha: ${item.fecha || 'No especificada'}`, bold: true }),
+                new TextRun({ 
+                  text: `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:`, 
+                  bold: true 
+                }),
               ],
             }),
             new Paragraph({
               children: [
-                new TextRun({ text: `GPT: ${item.gptUsado || 'No especificado'}`, bold: true }),
-              ],
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: `Pregunta: ${item.pregunta || 'Sin pregunta'}` }),
-              ],
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: `Respuesta: ${item.respuesta || 'Sin respuesta'}` }),
+                new TextRun({ text: msg.content }),
               ],
             }),
             new Paragraph({
               children: [new TextRun({ text: "" })],
             }),
-            new Paragraph({
-              children: [new TextRun({ text: "=".repeat(50) })],
-            }),
-            new Paragraph({
-              children: [new TextRun({ text: "" })],
-            }),
-          ];
-        });
+          ])
+        ];
 
         console.log('Elementos creados:', children.length);
 
@@ -436,7 +451,7 @@ useEffect(() => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `historial_gpt_${new Date().toISOString().split('T')[0]}.docx`;
+        a.download = `conversacion_${new Date().toISOString().split('T')[0]}.docx`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -445,7 +460,7 @@ useEffect(() => {
         console.log('Descarga iniciada exitosamente');
         toast({
           title: "Descarga completada",
-          description: "El historial se ha descargado como archivo .docx",
+          description: "La conversación se ha descargado como archivo .docx",
         });
       } catch (error) {
         console.error('Error generando .docx:', error);
@@ -460,38 +475,43 @@ useEffect(() => {
         const pdf = new jsPDF();
         let yPosition = 20;
         
-        historial.forEach((item: any, index: number) => {
-          if (yPosition > 280) {
+        // Encabezado
+        pdf.setFontSize(14);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(`Conversación - ${conversationData.fecha}`, 10, yPosition);
+        yPosition += 10;
+        
+        pdf.setFontSize(12);
+        pdf.text(`GPT: ${conversationData.gptUsado}`, 10, yPosition);
+        yPosition += 10;
+        
+        pdf.text(`Título: ${conversationData.titulo}`, 10, yPosition);
+        yPosition += 20;
+        
+        pdf.text(''.padEnd(50, '='), 10, yPosition);
+        yPosition += 15;
+        
+        messages.forEach((msg, index) => {
+          if (yPosition > 260) {
             pdf.addPage();
             yPosition = 20;
           }
           
-          pdf.setFontSize(12);
           pdf.setFont('helvetica', 'bold');
-          pdf.text(`Fecha: ${item.fecha}`, 10, yPosition);
-          yPosition += 10;
-          
-          pdf.text(`GPT: ${item.gptUsado}`, 10, yPosition);
+          pdf.text(`${msg.type === 'user' ? 'Usuario' : 'Asistente'}:`, 10, yPosition);
           yPosition += 10;
           
           pdf.setFont('helvetica', 'normal');
-          pdf.text(`Pregunta: ${item.pregunta}`, 10, yPosition);
-          yPosition += 10;
-          
-          pdf.text(`Respuesta: ${item.respuesta}`, 10, yPosition);
-          yPosition += 20;
-          
-          if (index < historial.length - 1) {
-            pdf.text(''.padEnd(50, '='), 10, yPosition);
-            yPosition += 10;
-          }
+          const lines = pdf.splitTextToSize(msg.content, 180);
+          pdf.text(lines, 10, yPosition);
+          yPosition += lines.length * 7 + 10;
         });
         
-        pdf.save(`historial_gpt_${new Date().toISOString().split('T')[0]}.pdf`);
+        pdf.save(`conversacion_${new Date().toISOString().split('T')[0]}.pdf`);
         
         toast({
           title: "Descarga completada",
-          description: "El historial se ha descargado como archivo .pdf",
+          description: "La conversación se ha descargado como archivo .pdf",
         });
       } catch (error) {
         toast({
@@ -1061,7 +1081,7 @@ useEffect(() => {
                 variant="outline" 
                 size="sm" 
                 className="rounded-[20px]"
-                onClick={() => downloadHistory('txt')}
+                onClick={() => downloadConversation('txt')}
               >
                 <Download className="h-4 w-4 mr-2" />
                 Guardar como .txt
@@ -1070,7 +1090,7 @@ useEffect(() => {
                 variant="outline" 
                 size="sm" 
                 className="rounded-[20px]"
-                onClick={() => downloadHistory('docx')}
+                onClick={() => downloadConversation('docx')}
               >
                 <Download className="h-4 w-4 mr-2" />
                 Guardar como .docx
@@ -1079,7 +1099,7 @@ useEffect(() => {
                 variant="outline" 
                 size="sm" 
                 className="rounded-[20px]"
-                onClick={() => downloadHistory('pdf')}
+                onClick={() => downloadConversation('pdf')}
               >
                 <Download className="h-4 w-4 mr-2" />
                 Guardar como .pdf
