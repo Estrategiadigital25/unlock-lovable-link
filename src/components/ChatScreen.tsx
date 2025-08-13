@@ -27,6 +27,14 @@ interface Message {
   gptUsed?: string;
 }
 
+interface Conversation {
+  id: string;
+  title: string;
+  messages: Message[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 interface Attachment {
   id: string;
   name: string;
@@ -48,6 +56,10 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
+  const [editingTitleValue, setEditingTitleValue] = useState('');
   const [historialBusquedas, setHistorialBusquedas] = useState<string[]>([]);
   const [selectedGPT, setSelectedGPT] = useState<string>('gpt4');
   const [customGPTs, setCustomGPTs] = useState<CustomGPT[]>([]);
@@ -77,15 +89,23 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
 
   // Cargar datos del localStorage al iniciar
   useEffect(() => {
-    const historialCompleto = localStorage.getItem("historialGPT");
+    const savedConversations = localStorage.getItem('conversations');
     const savedGPTs = localStorage.getItem('custom_gpts');
     
-    if (historialCompleto) {
+    if (savedConversations) {
       try {
-        const historial = JSON.parse(historialCompleto);
-        setHistorialBusquedas(historial.map((item: any) => item.pregunta || item));
+        const parsedConversations = JSON.parse(savedConversations).map((conv: any) => ({
+          ...conv,
+          createdAt: new Date(conv.createdAt),
+          updatedAt: new Date(conv.updatedAt),
+          messages: conv.messages.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp)
+          }))
+        }));
+        setConversations(parsedConversations);
       } catch (error) {
-        console.error('Error loading history:', error);
+        console.error('Error loading conversations:', error);
       }
     }
     
@@ -106,15 +126,123 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
     setMode('AUTO');
   };
 
+  // Generar título automático basado en el primer mensaje
+  const generateAutoTitle = (firstMessage: string): string => {
+    const words = firstMessage.trim().split(' ').slice(0, 6);
+    return words.join(' ') + (firstMessage.split(' ').length > 6 ? '...' : '');
+  };
+
+  // Guardar conversación actual
+  const saveCurrentConversation = () => {
+    if (messages.length === 0) return;
+
+    const now = new Date();
+    let conversation: Conversation;
+
+    if (currentConversationId) {
+      // Actualizar conversación existente
+      conversation = {
+        id: currentConversationId,
+        title: conversations.find(c => c.id === currentConversationId)?.title || generateAutoTitle(messages[0]?.content || ''),
+        messages: messages,
+        createdAt: conversations.find(c => c.id === currentConversationId)?.createdAt || now,
+        updatedAt: now
+      };
+    } else {
+      // Crear nueva conversación
+      conversation = {
+        id: Date.now().toString(),
+        title: generateAutoTitle(messages[0]?.content || 'Nueva conversación'),
+        messages: messages,
+        createdAt: now,
+        updatedAt: now
+      };
+      setCurrentConversationId(conversation.id);
+    }
+
+    const updatedConversations = conversations.filter(c => c.id !== conversation.id);
+    updatedConversations.unshift(conversation);
+    setConversations(updatedConversations);
+    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
+  };
+
   const handleNewSearch = () => {
+    // Guardar conversación actual si existe
+    if (messages.length > 0) {
+      saveCurrentConversation();
+    }
+
+    // Limpiar chat actual
     setMessages([]);
     setAttachments([]);
     setInputValue('');
     setMode('AUTO');
+    setCurrentConversationId(null);
     setIsNewChatOpen(false);
+    
     toast({
       title: "Nueva búsqueda iniciada",
       description: "El chat ha sido limpiado para empezar una nueva conversación.",
+    });
+  };
+
+  // Cargar una conversación existente
+  const loadConversation = (conversationId: string) => {
+    // Guardar conversación actual primero
+    if (messages.length > 0) {
+      saveCurrentConversation();
+    }
+
+    const conversation = conversations.find(c => c.id === conversationId);
+    if (conversation) {
+      setMessages(conversation.messages);
+      setCurrentConversationId(conversationId);
+      setAttachments([]);
+      setInputValue('');
+    }
+  };
+
+  // Editar título de conversación
+  const startEditingTitle = (conversationId: string, currentTitle: string) => {
+    setEditingTitleId(conversationId);
+    setEditingTitleValue(currentTitle);
+  };
+
+  const saveEditedTitle = () => {
+    if (!editingTitleId) return;
+
+    const updatedConversations = conversations.map(conv => 
+      conv.id === editingTitleId 
+        ? { ...conv, title: editingTitleValue.trim() || 'Sin título', updatedAt: new Date() }
+        : conv
+    );
+    
+    setConversations(updatedConversations);
+    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
+    setEditingTitleId(null);
+    setEditingTitleValue('');
+  };
+
+  const cancelEditingTitle = () => {
+    setEditingTitleId(null);
+    setEditingTitleValue('');
+  };
+
+  // Eliminar conversación
+  const deleteConversation = (conversationId: string) => {
+    const updatedConversations = conversations.filter(c => c.id !== conversationId);
+    setConversations(updatedConversations);
+    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
+    
+    // Si era la conversación actual, limpiar
+    if (currentConversationId === conversationId) {
+      setMessages([]);
+      setCurrentConversationId(null);
+    }
+    
+    toast({
+      title: "Conversación eliminada",
+      description: "La conversación ha sido eliminada del historial.",
     });
   };
 
@@ -372,9 +500,9 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
       gptUsed: 'Usuario'
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
 
-    // No guardar en historial local: "Nota de memoria: No guardar ninguna información de las sesiones de optimización"
     setInputValue('');
     setAttachments([]);
 
@@ -390,6 +518,11 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
     };
 
     setMessages(prev => [...prev, assistantMessage]);
+
+    // Auto-guardar conversación después de cada mensaje
+    setTimeout(() => {
+      saveCurrentConversation();
+    }, 100);
   };
 
   return (
@@ -409,14 +542,69 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
         </div>
         <ScrollArea className="h-[calc(50vh-120px)] flex-shrink-0">
           <div className="space-y-2">
-            {historialBusquedas.length === 0 ? (
+            {conversations.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
-                No hay búsquedas guardadas aún
+                No hay conversaciones guardadas aún
               </p>
             ) : (
-              historialBusquedas.map((busqueda, index) => (
-                <Card key={index} className="p-3 cursor-pointer hover:bg-accent/50 transition-colors">
-                  <p className="text-sm text-muted-foreground line-clamp-3">{busqueda}</p>
+              conversations.map((conversation) => (
+                <Card 
+                  key={conversation.id} 
+                  className={`p-3 cursor-pointer hover:bg-accent/50 transition-colors ${
+                    currentConversationId === conversation.id ? 'bg-accent' : ''
+                  }`}
+                  onClick={() => loadConversation(conversation.id)}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      {editingTitleId === conversation.id ? (
+                        <div className="space-y-2">
+                          <Input
+                            value={editingTitleValue}
+                            onChange={(e) => setEditingTitleValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveEditedTitle();
+                              if (e.key === 'Escape') cancelEditingTitle();
+                            }}
+                            onBlur={saveEditedTitle}
+                            className="h-6 text-sm"
+                            autoFocus
+                          />
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-sm font-medium line-clamp-2 mb-1">{conversation.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {conversation.updatedAt.toLocaleDateString('es-ES')} • {conversation.messages.length} mensajes
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startEditingTitle(conversation.id, conversation.title);
+                        }}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteConversation(conversation.id);
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
                 </Card>
               ))
             )}
