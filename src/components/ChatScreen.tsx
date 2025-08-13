@@ -442,12 +442,9 @@ useEffect(() => {
           }],
         });
 
-        console.log('Documento creado, generando buffer...');
-        const buffer = await Packer.toBuffer(doc);
-        console.log('Buffer generado, tamaño:', buffer.byteLength);
-
-        // Crear y descargar archivo
-        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        console.log('Documento creado, generando blob...');
+        const blob = await Packer.toBlob(doc);
+        console.log('Blob generado, tamaño:', blob.size);
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
