@@ -256,48 +256,22 @@ useEffect(() => {
     });
   };
 
-  // Guardar historial en localStorage con estructura mejorada
-  const handleSendMessage = () => {
-  if (!inputValue.trim()) return;
-
-  const userMessage: Message = {
-    id: Date.now().toString(),
-    type: 'user',
-    content: inputValue,
-    timestamp: new Date(),
-    attachments: attachments.length > 0 ? [...attachments] : undefined,
-    gptUsed: 'Usuario'
+  // Función para guardar en historial legacy
+  const saveToHistory = (pregunta: string, respuesta: string) => {
+    try {
+      const historial = JSON.parse(localStorage.getItem("historialGPT") || "[]");
+      const nuevoItem = {
+        fecha: new Date().toISOString().split('T')[0],
+        gptUsado: mode === 'SIN ASISTENTE' ? 'ChatGPT' : 'Asistente Ingtec',
+        pregunta: pregunta,
+        respuesta: respuesta
+      };
+      historial.unshift(nuevoItem);
+      localStorage.setItem("historialGPT", JSON.stringify(historial));
+    } catch (error) {
+      console.error('Error saving to history:', error);
+    }
   };
-
-  const updatedMessages = [...messages, userMessage];
-  setMessages(updatedMessages);
-
-  setInputValue('');
-  setAttachments([]);
-
-  const finalMode = mode === 'AUTO' ? detectMode(userMessage.content) : mode;
-  const formatted = optimizePrompt(userMessage.content, "ChatGPT", finalMode);
-
-  const assistantMessage: Message = {
-    id: (Date.now() + 1).toString(),
-    type: 'assistant',
-    content: mode === 'SIN ASISTENTE' ? formatted : `Modo: ${finalMode}\n\n${formatted}`,
-    timestamp: new Date(),
-    gptUsed: mode === 'SIN ASISTENTE' ? 'ChatGPT' : 'Asistente Ingtec'
-  };
-
-  // Añadimos la respuesta del asistente
-  const withAssistant = [...updatedMessages, assistantMessage];
-  setMessages(withAssistant);
-
-  // ✅ NUEVO: registrar en historial (pregunta + respuesta)
-  saveToHistory(userMessage.content, assistantMessage.content);
-
-  // Auto-guardar conversación
-  setTimeout(() => {
-    saveCurrentConversation();
-  }, 100);
-};
 
 
   // Limpiar historial
@@ -754,22 +728,20 @@ useEffect(() => {
         )}
 
         {/* Botón limpiar historial */}
-        <div className="mt-4 pt-4 border-t border-border">
+        <div className="mt-4 pt-4 border-border">
           <Button
-            <Button
-  onClick={clearHistory}
-  variant="outline"
-  size="sm"
-  className="w-full border-2 text-white hover:opacity-90"
-  style={{ backgroundColor: '#a7db74', borderColor: '#a7db74' }}
-  // ✅ ANTES: disabled={historialBusquedas.length === 0}
-  // ✅ AHORA: deshabilita solo si NO hay conversaciones Y NO hay historial
-  disabled={conversations.length === 0 && historialBusquedas.length === 0}
->
-  <Trash2 className="h-4 w-4 mr-2" />
-  Limpiar historial local
-</Button>
-
+            onClick={clearHistory}
+            variant="outline"
+            size="sm"
+            className="w-full border-2 text-white hover:opacity-90"
+            style={{ backgroundColor: '#a7db74', borderColor: '#a7db74' }}
+            disabled={conversations.length === 0 && historialBusquedas.length === 0}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Limpiar historial local
+          </Button>
+        </div>
+      </div>
 
       {/* Área principal del chat */}
       <div className="flex-1 flex flex-col">
