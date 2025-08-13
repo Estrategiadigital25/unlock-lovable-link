@@ -1,13 +1,12 @@
-import Toaster from "@/components/ui/toaster"  // 👈 importa el Toaster
+import Toaster from "./components/ui/toaster"; // ← ruta relativa
 
 function App() {
   return (
     <>
       {/* tu UI */}
-      <Toaster /> {/* 👈 montado UNA sola vez */}
+      <Toaster /> {/* ← Montado una sola vez. Tiene guard anti-duplicados */}
     </>
-  )
+  );
 }
 
-export default App
-
+export default App;
