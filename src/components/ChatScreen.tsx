@@ -368,32 +368,58 @@ useEffect(() => {
       });
     } else if (format === 'docx') {
       try {
-        const children = historial.flatMap((item: any) => [
-          new Paragraph({
-            children: [
-              new TextRun({ text: `Fecha: ${item.fecha}`, bold: true }),
-            ],
-          }),
-          new Paragraph({
-            children: [
-              new TextRun({ text: `GPT: ${item.gptUsado}`, bold: true }),
-            ],
-          }),
-          new Paragraph({
-            children: [
-              new TextRun({ text: `Pregunta: ${item.pregunta}` }),
-            ],
-          }),
-          new Paragraph({
-            children: [
-              new TextRun({ text: `Respuesta: ${item.respuesta}` }),
-            ],
-          }),
-          new Paragraph({ text: "" }),
-          new Paragraph({ text: "".padEnd(50, "=") }),
-          new Paragraph({ text: "" }),
-        ]);
+        console.log('Iniciando generación de .docx...');
+        console.log('Historial cargado:', historial.length, 'elementos');
+        
+        if (historial.length === 0) {
+          toast({
+            title: "Aviso",
+            description: "No hay historial para descargar",
+            variant: "destructive"
+          });
+          return;
+        }
 
+        // Crear contenido del documento
+        const children = historial.flatMap((item: any, index: number) => {
+          console.log(`Procesando elemento ${index + 1}:`, item);
+          
+          return [
+            new Paragraph({
+              children: [
+                new TextRun({ text: `Fecha: ${item.fecha || 'No especificada'}`, bold: true }),
+              ],
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: `GPT: ${item.gptUsado || 'No especificado'}`, bold: true }),
+              ],
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: `Pregunta: ${item.pregunta || 'Sin pregunta'}` }),
+              ],
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: `Respuesta: ${item.respuesta || 'Sin respuesta'}` }),
+              ],
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: "" })],
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: "=".repeat(50) })],
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: "" })],
+            }),
+          ];
+        });
+
+        console.log('Elementos creados:', children.length);
+
+        // Crear documento
         const doc = new Document({
           sections: [{
             properties: {},
@@ -401,7 +427,11 @@ useEffect(() => {
           }],
         });
 
+        console.log('Documento creado, generando buffer...');
         const buffer = await Packer.toBuffer(doc);
+        console.log('Buffer generado, tamaño:', buffer.byteLength);
+
+        // Crear y descargar archivo
         const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -412,14 +442,16 @@ useEffect(() => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
+        console.log('Descarga iniciada exitosamente');
         toast({
           title: "Descarga completada",
           description: "El historial se ha descargado como archivo .docx",
         });
       } catch (error) {
+        console.error('Error generando .docx:', error);
         toast({
           title: "Error",
-          description: "No se pudo generar el archivo .docx",
+          description: `Error al generar .docx: ${error instanceof Error ? error.message : 'Error desconocido'}`,
           variant: "destructive"
         });
       }
