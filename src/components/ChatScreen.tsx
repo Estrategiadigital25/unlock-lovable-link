@@ -88,35 +88,45 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   ];
 
   // Cargar datos del localStorage al iniciar
-  useEffect(() => {
-    const savedConversations = localStorage.getItem('conversations');
-    const savedGPTs = localStorage.getItem('custom_gpts');
-    
-    if (savedConversations) {
-      try {
-        const parsedConversations = JSON.parse(savedConversations).map((conv: any) => ({
-          ...conv,
-          createdAt: new Date(conv.createdAt),
-          updatedAt: new Date(conv.updatedAt),
-          messages: conv.messages.map((msg: any) => ({
-            ...msg,
-            timestamp: new Date(msg.timestamp)
-          }))
-        }));
-        setConversations(parsedConversations);
-      } catch (error) {
-        console.error('Error loading conversations:', error);
-      }
+  // Cargar datos del localStorage al iniciar
+useEffect(() => {
+  const savedConversations = localStorage.getItem('conversations');
+  const savedGPTs = localStorage.getItem('custom_gpts');
+
+  if (savedConversations) {
+    try {
+      const parsedConversations = JSON.parse(savedConversations).map((conv: any) => ({
+        ...conv,
+        createdAt: new Date(conv.createdAt),
+        updatedAt: new Date(conv.updatedAt),
+        messages: conv.messages.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        }))
+      }));
+      setConversations(parsedConversations);
+    } catch (error) {
+      console.error('Error loading conversations:', error);
     }
-    
-    if (savedGPTs) {
-      try {
-        setCustomGPTs(JSON.parse(savedGPTs));
-      } catch (error) {
-        console.error('Error loading GPTs:', error);
-      }
+  }
+
+  if (savedGPTs) {
+    try {
+      setCustomGPTs(JSON.parse(savedGPTs));
+    } catch (error) {
+      console.error('Error loading GPTs:', error);
     }
-  }, []);
+  }
+
+  // ✅ NUEVO: cargar preguntas del historial para habilitar el botón
+  try {
+    const hist = JSON.parse(localStorage.getItem('historialGPT') || '[]');
+    setHistorialBusquedas(Array.isArray(hist) ? hist.map((i: any) => i.pregunta) : []);
+  } catch {
+    setHistorialBusquedas([]);
+  }
+}, []);
+
 
   const handleLogout = () => {
     // Solo limpiar datos de la sesión actual
@@ -247,25 +257,48 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   };
 
   // Guardar historial en localStorage con estructura mejorada
-  const saveToHistory = (query: string, response?: string) => {
-    let historial = JSON.parse(localStorage.getItem("historialGPT") || "[]");
-    
-    // Estructura mejorada con validación
-    const nuevaBusqueda = {
-      id: Date.now().toString(),
-      fecha: new Date().toLocaleString('es-ES'),
-      pregunta: query.trim(),
-      respuesta: response || "Pendiente...",
-      gptUsado: [...defaultGPTs, ...customGPTs].find(gpt => gpt.id === selectedGPT)?.name || 'GPT Base'
-    };
-    
-    // Agregar al inicio y limitar a 50 elementos para no sobrecargar localStorage
-    historial.unshift(nuevaBusqueda);
-    historial = historial.slice(0, 50);
-    
-    localStorage.setItem("historialGPT", JSON.stringify(historial));
-    setHistorialBusquedas(historial.map(item => item.pregunta));
+  const handleSendMessage = () => {
+  if (!inputValue.trim()) return;
+
+  const userMessage: Message = {
+    id: Date.now().toString(),
+    type: 'user',
+    content: inputValue,
+    timestamp: new Date(),
+    attachments: attachments.length > 0 ? [...attachments] : undefined,
+    gptUsed: 'Usuario'
   };
+
+  const updatedMessages = [...messages, userMessage];
+  setMessages(updatedMessages);
+
+  setInputValue('');
+  setAttachments([]);
+
+  const finalMode = mode === 'AUTO' ? detectMode(userMessage.content) : mode;
+  const formatted = optimizePrompt(userMessage.content, "ChatGPT", finalMode);
+
+  const assistantMessage: Message = {
+    id: (Date.now() + 1).toString(),
+    type: 'assistant',
+    content: mode === 'SIN ASISTENTE' ? formatted : `Modo: ${finalMode}\n\n${formatted}`,
+    timestamp: new Date(),
+    gptUsed: mode === 'SIN ASISTENTE' ? 'ChatGPT' : 'Asistente Ingtec'
+  };
+
+  // Añadimos la respuesta del asistente
+  const withAssistant = [...updatedMessages, assistantMessage];
+  setMessages(withAssistant);
+
+  // ✅ NUEVO: registrar en historial (pregunta + respuesta)
+  saveToHistory(userMessage.content, assistantMessage.content);
+
+  // Auto-guardar conversación
+  setTimeout(() => {
+    saveCurrentConversation();
+  }, 100);
+};
+
 
   // Limpiar historial
   const clearHistory = () => {
@@ -723,18 +756,20 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
         {/* Botón limpiar historial */}
         <div className="mt-4 pt-4 border-t border-border">
           <Button
-            onClick={clearHistory}
-            variant="outline"
-            size="sm"
-            className="w-full border-2 text-white hover:opacity-90"
-            style={{ backgroundColor: '#a7db74', borderColor: '#a7db74' }}
-            disabled={historialBusquedas.length === 0}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Limpiar historial local
-          </Button>
-        </div>
-      </div>
+            <Button
+  onClick={clearHistory}
+  variant="outline"
+  size="sm"
+  className="w-full border-2 text-white hover:opacity-90"
+  style={{ backgroundColor: '#a7db74', borderColor: '#a7db74' }}
+  // ✅ ANTES: disabled={historialBusquedas.length === 0}
+  // ✅ AHORA: deshabilita solo si NO hay conversaciones Y NO hay historial
+  disabled={conversations.length === 0 && historialBusquedas.length === 0}
+>
+  <Trash2 className="h-4 w-4 mr-2" />
+  Limpiar historial local
+</Button>
+
 
       {/* Área principal del chat */}
       <div className="flex-1 flex flex-col">
