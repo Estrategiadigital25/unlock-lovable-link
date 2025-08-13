@@ -1,33 +1,29 @@
-import { useToast } from "@/hooks/use-toast"
-import {
-  Toast,
-  ToastClose,
-  ToastDescription,
-  ToastProvider,
-  ToastTitle,
-  ToastViewport,
-} from "@/components/ui/toast"
+// src/components/ui/toaster.tsx
+import { X } from "lucide-react"
+import { Toast, ToastTitle, ToastDescription, ToastViewport } from "@/components/ui/toast"
+import { useToast, useToastState } from "@/components/ui/use-toast"
 
 export function Toaster() {
-  const { toasts } = useToast()
+  const toasts = useToastState()
+  const { dismiss } = useToast()
 
   return (
-    <ToastProvider>
-      {toasts.map(function ({ id, title, description, action, ...props }) {
-        return (
-          <Toast key={id} {...props}>
-            <div className="grid gap-1">
-              {title && <ToastTitle>{title}</ToastTitle>}
-              {description && (
-                <ToastDescription>{description}</ToastDescription>
-              )}
-            </div>
-            {action}
-            <ToastClose />
+    <ToastViewport>
+      {toasts.map((t) => (
+        <div key={t.id} className="relative mb-2">
+          <Toast variant={t.variant} title={t.title} description={t.description}>
+            <button
+              aria-label="Cerrar"
+              className="absolute right-2 top-2 rounded p-1 opacity-70 hover:opacity-100 focus:outline-none focus:ring"
+              onClick={() => dismiss(t.id)}
+            >
+              <X className="h-4 w-4" />
+            </button>
           </Toast>
-        )
-      })}
-      <ToastViewport />
-    </ToastProvider>
+        </div>
+      ))}
+    </ToastViewport>
   )
 }
+
+export default Toaster
