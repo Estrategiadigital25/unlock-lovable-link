@@ -1,48 +1,96 @@
 // src/lib/api.ts
-/**
- * Cliente para Supabase Edge Functions.
- * Usa las Edge Functions integradas en lugar de API Gateway externo.
- */
-
 export type ChatMessage = {
   role: "system" | "user" | "assistant";
   content: string;
 };
 
-/** Llama a la Edge Function de Supabase y devuelve el texto de respuesta */
+type AskChatResponse = {
+  reply?: string;
+  model?: string;
+  finish_reason?: string;
+  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+  latency_ms?: number;
+  request_id?: string;
+  error?: string;
+  detail?: string;
+};
+
+function getApiUrl() {
+  const url = import.meta.env.VITE_API_URL as string | undefined;
+  if (!url) {
+    throw new Error(
+      "Falta VITE_API_URL. Configúrala en Amplify/Lovable → Environment variables y vuelve a publicar."
+    );
+  }
+  return url.replace(/\/+$/, "");
+}
+
+function withTimeout(ms: number) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(new Error("timeout")), ms);
+  return { signal: controller.signal, cancel: () => clearTimeout(id) };
+}
+
+async function doFetchWithRetry(input: RequestInfo, init: RequestInit, retries = 1) {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const { signal, cancel } = withTimeout(45_000);
+    try {
+      const res = await fetch(input, { ...init, signal });
+      cancel();
+      if (!res.ok && (res.status === 429 || res.status >= 500) && attempt < retries) {
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+        continue;
+      }
+      return res;
+    } catch (e) {
+      cancel();
+      lastErr = e;
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr;
+}
+
 export async function askChat(messages: ChatMessage[], model = "gpt-4o-mini") {
-  // URL de la Edge Function de Supabase
-  const EDGE_FUNCTION_URL = `https://lozhxacampqoxmjbnekf.supabase.co/functions/v1/chat`;
+  const API_URL = getApiUrl();
 
-  const res = await fetch(EDGE_FUNCTION_URL, {
+  const res = await doFetchWithRetry(API_URL, {
     method: "POST",
-    headers: { 
-      "Content-Type": "application/json",
-      "Authorization": `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxvemh4YWNhbXBxb3htamJuZWtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwNTQ1NjIsImV4cCI6MjA2OTYzMDU2Mn0.qKpRbXEFQyRZW4Zj1XiUkNHLdxEqK99iBkfGGEBeZFA`
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messages, model }),
-  });
+  }, 1);
 
-  // Si algo falla, lanza un error con detalle para verlo en consola
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(
       `Error API (${res.status}): ${text || "sin detalles"}\n` +
-      `Tip: revisa los logs de la Edge Function en Supabase.`
+      `Tip: revisa CORS (origin), logs de CloudWatch y que la URL sea correcta.`
     );
   }
 
-  const data = (await res.json()) as { reply?: string };
+  const data = (await res.json()) as AskChatResponse;
+  if (data.error) {
+    throw new Error(`Error API: ${data.error}${data.detail ? " — " + data.detail : ""}`);
+  }
   return data.reply ?? "";
 }
 
-/** Opcional: ping rápido para saber si la API responde */
+/** GET /health en tu API para no gastar tokens */
 export async function healthCheck() {
   try {
-    // Envía un mensaje mínimo
-    await askChat([{ role: "user", content: "ping" }], "gpt-4o-mini");
-    return true;
+    const API_URL = getApiUrl();
+    const { signal, cancel } = withTimeout(4000);
+    const res = await fetch(`${API_URL}/health`, { method: "GET", signal });
+    cancel();
+    return res.ok;
   } catch {
     return false;
   }
+}
+
 }
