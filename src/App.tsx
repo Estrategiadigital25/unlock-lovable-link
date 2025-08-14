@@ -1,27 +1,21 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+// src/App.tsx
+import { useState } from "react";
+import LoginScreen from "@/components/LoginScreen";
+import ChatScreen from "@/components/ChatScreen";
+import AdminPanel from "@/components/AdminPanel";
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+type Screen = 'login' | 'chat' | 'admin';
 
-export default App;
+export default function App() {
+  const [currentScreen, setCurrentScreen] = useState<Screen>('login');
+
+  const handleLogin = () => setCurrentScreen('chat');
+  const handleAdminPanel = () => setCurrentScreen('admin');
+  const handleBackToChat = () => setCurrentScreen('chat');
+
+  if (currentScreen === 'login') return <LoginScreen onLogin={handleLogin} />;
+  if (currentScreen === 'admin') return <AdminPanel onBack={handleBackToChat} />;
+
+  return <ChatScreen onAdminPanel={handleAdminPanel} />;
+}
