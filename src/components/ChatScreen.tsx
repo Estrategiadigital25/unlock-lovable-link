@@ -574,6 +574,19 @@ useEffect(() => {
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
 
+    // Create user message
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      type: 'user',
+      content: inputValue.trim(),
+      timestamp: new Date(),
+      gptUsed: "Usuario"
+    };
+
+    // Add user message to state and clear input
+    setMessages(prev => [...prev, userMessage]);
+    setInputValue('');
+
 // Detecta modo y prepara instrucciones opcionales para “system”
 const finalMode = mode === 'AUTO' ? detectMode(userMessage.content) : mode;
 
