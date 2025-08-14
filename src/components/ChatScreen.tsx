@@ -13,6 +13,7 @@ import jsPDF from 'jspdf';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { useToast } from "@/components/ui/use-toast";
 import { optimizePrompt, detectMode, type Mode } from "@/lib/promptOptimizer";
+import { askChat, type ChatMessage } from "@/lib/api";
 
 interface ChatScreenProps {
   onAdminPanel: () => void;
@@ -50,6 +51,20 @@ interface CustomGPT {
   instructions: string;
   icon: string;
   isDefault?: boolean;
+}
+
+function toChatMessages(messages: Message[], systemText?: string): ChatMessage[] {
+  const chat: ChatMessage[] = [];
+  if (systemText?.trim()) {
+    chat.push({ role: "system", content: systemText.trim() });
+  }
+  for (const m of messages) {
+    chat.push({
+      role: m.type === "user" ? "user" : "assistant",
+      content: m.content,
+    });
+  }
+  return chat;
 }
 
 const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
@@ -559,33 +574,48 @@ useEffect(() => {
   const handleSendMessage = () => {
     if (!inputValue.trim()) return;
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      type: 'user',
-      content: inputValue,
-      timestamp: new Date(),
-      attachments: attachments.length > 0 ? [...attachments] : undefined,
-      gptUsed: 'Usuario'
-    };
+// Detecta modo y prepara instrucciones opcionales para “system”
+const finalMode = mode === 'AUTO' ? detectMode(userMessage.content) : mode;
 
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
+// Si quieres que las instrucciones del modo entren como “system”, constrúyelas aquí:
+const systemPrompt =
+  finalMode === 'SIN ASISTENTE'
+    ? '' // no uses system si es “sin asistente”
+    : `Eres un asistente de Ingtec. Modo: ${finalMode}.
+Responde con precisión, claro y útil. Mantén un tono profesional y cercano.`;
 
-    setInputValue('');
-    setAttachments([]);
+// Llama a tu API (AWS → Lambda → OpenAI) con el historial actualizado
+try {
+  const replyText = await askChat(
+    toChatMessages(updatedMessages, systemPrompt)
+  );
 
-    const finalMode = mode === 'AUTO' ? detectMode(userMessage.content) : mode;
-    const formatted = optimizePrompt(userMessage.content, "ChatGPT", finalMode);
+  const assistantMessage: Message = {
+    id: (Date.now() + 1).toString(),
+    type: 'assistant',
+    content: replyText || "No recibí contenido de respuesta.",
+    timestamp: new Date(),
+    gptUsed: finalMode === 'SIN ASISTENTE' ? 'ChatGPT' : 'Asistente Ingtec'
+  };
 
-    const assistantMessage: Message = {
+  setMessages(prev => [...prev, assistantMessage]);
+
+  // (Opcional) guardar también en historial legacy:
+  saveToHistory(userMessage.content, assistantMessage.content);
+} catch (err) {
+  console.error("Error al llamar a la API:", err);
+  setMessages(prev => [
+    ...prev,
+    {
       id: (Date.now() + 1).toString(),
       type: 'assistant',
-      content: mode === 'SIN ASISTENTE' ? formatted : `Modo: ${finalMode}\n\n${formatted}`,
+      content: "❌ Ocurrió un error al conectar con el servidor.",
       timestamp: new Date(),
-      gptUsed: mode === 'SIN ASISTENTE' ? 'ChatGPT' : 'Asistente Ingtec'
-    };
+      gptUsed: "Error"
+    }
+  ]);
+}
 
-    setMessages(prev => [...prev, assistantMessage]);
 
     // Auto-guardar conversación después de cada mensaje
     setTimeout(() => {
