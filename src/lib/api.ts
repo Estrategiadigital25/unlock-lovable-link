@@ -18,8 +18,7 @@ type AskChatResponse = {
 function getApiUrl() {
   const url = import.meta.env.VITE_API_URL as string | undefined;
   if (!url) {
-    VITE_API_URL = https://9zuwoytu2f.execute-api.us-east-1.amazonaws.com
-    );
+    return "https://9zuwoytu2f.execute-api.us-east-1.amazonaws.com";
   }
   return url.replace(/\/+$/, "");
 }
