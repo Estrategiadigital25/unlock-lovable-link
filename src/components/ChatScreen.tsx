@@ -571,7 +571,7 @@ useEffect(() => {
     });
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
 
 // Detecta modo y prepara instrucciones opcionales para “system”
@@ -584,10 +584,11 @@ const systemPrompt =
     : `Eres un asistente de Ingtec. Modo: ${finalMode}.
 Responde con precisión, claro y útil. Mantén un tono profesional y cercano.`;
 
+
 // Llama a tu API (AWS → Lambda → OpenAI) con el historial actualizado
 try {
   const replyText = await askChat(
-    toChatMessages(updatedMessages, systemPrompt)
+    toChatMessages([...messages, userMessage], systemPrompt)
   );
 
   const assistantMessage: Message = {
