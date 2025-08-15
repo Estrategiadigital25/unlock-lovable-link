@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -12,7 +11,7 @@ import { Download, Copy, Edit, Settings, Plus, Paperclip, Image, FileText, Trash
 import jsPDF from 'jspdf';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { useToast } from "@/components/ui/use-toast";
-import { optimizePrompt, detectMode, type Mode } from "@/lib/promptOptimizer";
+import { detectMode, type Mode } from "@/lib/promptOptimizer";
 import { askChat, type ChatMessage } from "@/lib/api";
 
 interface ChatScreenProps {
@@ -53,20 +52,6 @@ interface CustomGPT {
   isDefault?: boolean;
 }
 
-function toChatMessages(messages: Message[], systemText?: string): ChatMessage[] {
-  const chat: ChatMessage[] = [];
-  if (systemText?.trim()) {
-    chat.push({ role: "system", content: systemText.trim() });
-  }
-  for (const m of messages) {
-    chat.push({
-      role: m.type === "user" ? "user" : "assistant",
-      content: m.content,
-    });
-  }
-  return chat;
-}
-
 const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -86,7 +71,6 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   const [testOutput, setTestOutput] = useState('');
   
   const [mode, setMode] = useState<Mode>('AUTO');
-  const [isNewChatOpen, setIsNewChatOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -142,14 +126,6 @@ useEffect(() => {
   }
 }, []);
 
-
-  const handleLogout = () => {
-    // Solo limpiar datos de la sesión actual
-    setMessages([]);
-    setAttachments([]);
-    setInputValue('');
-    setMode('AUTO');
-  };
 
   // Generar título automático basado en el primer mensaje
   const generateAutoTitle = (firstMessage: string): string => {
@@ -572,70 +548,81 @@ useEffect(() => {
   };
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim()) return;
+  if (!inputValue.trim()) return;
 
-    // Create user message
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      type: 'user',
-      content: inputValue.trim(),
-      timestamp: new Date(),
-      gptUsed: "Usuario"
-    };
-
-    // Add user message to state and clear input
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
-
-// Detecta modo y prepara instrucciones opcionales para “system”
-const finalMode = mode === 'AUTO' ? detectMode(userMessage.content) : mode;
-
-// Si quieres que las instrucciones del modo entren como “system”, constrúyelas aquí:
-const systemPrompt =
-  finalMode === 'SIN ASISTENTE'
-    ? '' // no uses system si es “sin asistente”
-    : `Eres un asistente de Ingtec. Modo: ${finalMode}.
-Responde con precisión, claro y útil. Mantén un tono profesional y cercano.`;
-
-
-// Llama a tu API (AWS → Lambda → OpenAI) con el historial actualizado
-try {
-  const replyText = await askChat(
-    toChatMessages([...messages, userMessage], systemPrompt)
-  );
-
-  const assistantMessage: Message = {
-    id: (Date.now() + 1).toString(),
-    type: 'assistant',
-    content: replyText || "No recibí contenido de respuesta.",
+  // 1) Mensaje del usuario
+  const userMessage: Message = {
+    id: Date.now().toString(),
+    type: 'user',
+    content: inputValue,
     timestamp: new Date(),
-    gptUsed: finalMode === 'SIN ASISTENTE' ? 'ChatGPT' : 'Asistente Ingtec'
+    attachments: attachments.length > 0 ? [...attachments] : undefined,
+    gptUsed: 'Usuario'
   };
 
-  setMessages(prev => [...prev, assistantMessage]);
+  const updatedMessages = [...messages, userMessage];
+  setMessages(updatedMessages);
 
-  // (Opcional) guardar también en historial legacy:
-  saveToHistory(userMessage.content, assistantMessage.content);
-} catch (err) {
-  console.error("Error al llamar a la API:", err);
-  setMessages(prev => [
-    ...prev,
-    {
+  // limpiar input/adjuntos
+  setInputValue('');
+  setAttachments([]);
+
+  // 2) (solo etiqueta/UX)
+  const finalMode = mode === 'AUTO' ? detectMode(userMessage.content) : mode;
+
+  // 3) Historial para tu API
+  const historyForApi: ChatMessage[] = updatedMessages.map((m) => ({
+    role: m.type === 'assistant' ? 'assistant' : 'user',
+    content: m.content,
+  }));
+
+  try {
+    // 4) Llamada real a tu backend (API Gateway -> Lambda)
+    const replyText = await askChat(historyForApi, "gpt-4o-mini");
+
+    // 5) Mensaje del asistente
+    const assistantMessage: Message = {
       id: (Date.now() + 1).toString(),
       type: 'assistant',
-      content: "❌ Ocurrió un error al conectar con el servidor.",
+      content: replyText,
       timestamp: new Date(),
-      gptUsed: "Error"
-    }
-  ]);
-}
+      gptUsed: finalMode === 'SIN ASISTENTE' ? 'ChatGPT' : 'Asistente Ingtec'
+    };
 
+    setMessages((prev) => [...prev, assistantMessage]);
 
-    // Auto-guardar conversación después de cada mensaje
+    // 6) Auto-guardar
     setTimeout(() => {
       saveCurrentConversation();
     }, 100);
-  };
+
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const errorMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      type: 'assistant',
+      content: `❌ Error al conectar con el servidor.\n\n${msg}`,
+      timestamp: new Date(),
+      gptUsed: "Error"
+    };
+    setMessages((prev) => [...prev, errorMessage]);
+  }
+};
+
+
+  } catch (err) {
+    // ⬇️ Aquí mostramos el detalle real si la API devuelve error
+    const msg = err instanceof Error ? err.message : String(err);
+    const errorMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      type: 'assistant',
+      content: `❌ Error al conectar con el servidor.\n\n${msg}`,
+      timestamp: new Date(),
+      gptUsed: "Error"
+    };
+    setMessages((prev) => [...prev, errorMessage]);
+  }
+};
 
   return (
     <div className="min-h-screen bg-background font-montserrat flex">

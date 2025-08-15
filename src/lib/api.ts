@@ -18,7 +18,9 @@ type AskChatResponse = {
 function getApiUrl() {
   const url = import.meta.env.VITE_API_URL as string | undefined;
   if (!url) {
-    return "https://9zuwoytu2f.execute-api.us-east-1.amazonaws.com";
+    throw new Error(
+      "Falta VITE_API_URL. Configúrala en Amplify/Lovable → Environment variables y vuelve a publicar."
+    );
   }
   return url.replace(/\/+$/, "");
 }
