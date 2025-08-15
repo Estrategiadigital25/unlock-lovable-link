@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
 import { Download, Copy, Edit, Settings, Plus, Paperclip, Image, FileText, Trash2, Bot, User } from "lucide-react";
 import jsPDF from 'jspdf';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
@@ -64,6 +65,7 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   const [selectedGPT, setSelectedGPT] = useState<string>('gpt4');
   const [customGPTs, setCustomGPTs] = useState<CustomGPT[]>([]);
   const [isCreatingGPT, setIsCreatingGPT] = useState(false);
+  const [isNewChatOpen, setIsNewChatOpen] = useState(false);
   const [newGPTName, setNewGPTName] = useState('');
   const [newGPTDescription, setNewGPTDescription] = useState('');
   const [newGPTInstructions, setNewGPTInstructions] = useState('');
@@ -597,21 +599,6 @@ useEffect(() => {
     }, 100);
 
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    const errorMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      type: 'assistant',
-      content: `❌ Error al conectar con el servidor.\n\n${msg}`,
-      timestamp: new Date(),
-      gptUsed: "Error"
-    };
-    setMessages((prev) => [...prev, errorMessage]);
-  }
-};
-
-
-  } catch (err) {
-    // ⬇️ Aquí mostramos el detalle real si la API devuelve error
     const msg = err instanceof Error ? err.message : String(err);
     const errorMessage: Message = {
       id: (Date.now() + 1).toString(),
