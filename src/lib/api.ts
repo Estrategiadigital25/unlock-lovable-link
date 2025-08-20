@@ -1,5 +1,5 @@
 // src/lib/api.ts
-const BASE = (import.meta.env.VITE_API_URL as string || 'https://9zuwoytu2f.execute-api.us-east-1.amazonaws.com').replace(/\/$/, "");
+const BASE = (import.meta.env.VITE_API_URL || 'https://9zuwoytu2f.execute-api.us-east-1.amazonaws.com').replace(/\/$/, "");
 
 export interface ChatMessage {
   role: string;
