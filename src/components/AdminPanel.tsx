@@ -1,116 +1,306 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { ArrowLeft, Copy, Download, User, MessageSquare, Calendar, Database } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import { getAppMode } from "@/lib/appMode";
+import { getLegacyHistory, getChatHistory, getUserEmail, type MockHistory, type ChatMessage } from "@/lib/localStorage";
 
 interface AdminPanelProps {
   onBack: () => void;
 }
 
 const AdminPanel = ({ onBack }: AdminPanelProps) => {
-  const registros = [
-    {
-      usuario: "juan@iespecialidades.com",
-      fecha: "28/07/2025",
-      horaEntrada: "09:05",
-      horaSalida: "09:54",
-      tiempoActivo: "00:49",
-      ip: "181.55.34.98",
-      busquedas: 6
-    },
-    {
-      usuario: "maria@iespecialidades.com",
-      fecha: "28/07/2025",
-      horaEntrada: "10:15",
-      horaSalida: "11:30",
-      tiempoActivo: "01:15",
-      ip: "181.55.34.102",
-      busquedas: 12
-    },
-    {
-      usuario: "carlos@iespecialidades.com",
-      fecha: "28/07/2025",
-      horaEntrada: "08:30",
-      horaSalida: "12:45",
-      tiempoActivo: "04:15",
-      ip: "181.55.34.85",
-      busquedas: 28
-    }
-  ];
+  const [activeTab, setActiveTab] = useState<'overview' | 'sessions' | 'logs'>('overview');
+  const [legacyHistory, setLegacyHistory] = useState<MockHistory[]>([]);
+  const [currentChat, setCurrentChat] = useState<ChatMessage[]>([]);
+  const { toast } = useToast();
+  const appMode = getAppMode();
+  const userEmail = getUserEmail();
 
-  const handleDownloadReport = () => {
-    // Simular descarga de reporte
-    console.log("Descargando reporte .xlsx del día");
+  useEffect(() => {
+    // Cargar datos del localStorage
+    const history = getLegacyHistory();
+    const chat = getChatHistory();
+    setLegacyHistory(history);
+    setCurrentChat(chat);
+  }, []);
+
+  const copyAllLogs = () => {
+    const allData = {
+      appMode,
+      userEmail,
+      timestamp: new Date().toISOString(),
+      currentSession: {
+        messages: currentChat,
+        messageCount: currentChat.length
+      },
+      legacyHistory: legacyHistory,
+      historyCount: legacyHistory.length
+    };
+
+    const logText = JSON.stringify(allData, null, 2);
+    
+    navigator.clipboard.writeText(logText).then(() => {
+      toast({
+        title: "Logs copiados",
+        description: `Se han copiado ${legacyHistory.length} registros del historial al portapapeles`,
+      });
+    }).catch(() => {
+      toast({
+        title: "Error",
+        description: "No se pudieron copiar los logs",
+        variant: "destructive"
+      });
+    });
+  };
+
+  const downloadLogs = () => {
+    const allData = {
+      appMode,
+      userEmail,
+      exportDate: new Date().toISOString(),
+      currentSession: currentChat,
+      legacyHistory: legacyHistory
+    };
+
+    const dataStr = JSON.stringify(allData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ingtec-logs-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Descarga iniciada",
+      description: "Los logs se están descargando como archivo JSON",
+    });
   };
 
   return (
-    <div className="min-h-screen bg-background font-montserrat p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center gap-4 mb-6">
-          <Button
-            onClick={onBack}
-            variant="outline"
-            size="sm"
-            className="rounded-[20px]"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver al Chat
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Panel de monitoreo – Administrador</h1>
-            <p className="text-muted-foreground mt-1">
-              Aquí puedes consultar los registros de ingreso, duración de sesión, IP y cantidad de búsquedas por usuario.
-            </p>
+    <div className="min-h-screen bg-background p-6 font-montserrat">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center space-x-4">
+            <Button onClick={onBack} variant="outline" size="sm">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Volver al Chat
+            </Button>
+            <div className="flex items-center space-x-3">
+              <img src="/lovable-uploads/4c7e0a4b-080a-437a-b8e8-bb34ebe70495.png" alt="Ingtec" className="w-8 h-8" />
+              <div>
+                <h1 className="text-2xl font-bold">Panel de Administración</h1>
+                <p className="text-muted-foreground">Gestión y monitoreo del Buscador GPT</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Badge variant={appMode === 'mock' ? 'secondary' : 'default'}>
+              {appMode === 'mock' ? 'MODO MOCK' : 'MODO PROD'}
+            </Badge>
+            <Badge variant="outline">
+              {userEmail}
+            </Badge>
           </div>
         </div>
 
-        <Card className="shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-xl font-semibold">Registros de Actividad</CardTitle>
-            <Button 
-              onClick={handleDownloadReport}
-              className="rounded-[20px] bg-primary hover:bg-primary/90"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              📥 Descargar reporte .xlsx del día
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Usuario</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Hora de entrada</TableHead>
-                  <TableHead>Hora de salida</TableHead>
-                  <TableHead>Tiempo activo</TableHead>
-                  <TableHead>IP</TableHead>
-                  <TableHead className="text-right">Búsquedas</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {registros.map((registro, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="font-medium">{registro.usuario}</TableCell>
-                    <TableCell>{registro.fecha}</TableCell>
-                    <TableCell>{registro.horaEntrada}</TableCell>
-                    <TableCell>{registro.horaSalida}</TableCell>
-                    <TableCell>{registro.tiempoActivo}</TableCell>
-                    <TableCell className="font-mono text-sm">{registro.ip}</TableCell>
-                    <TableCell className="text-right font-semibold">{registro.busquedas}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <div className="mt-6 p-4 bg-accent/20 rounded-lg border border-accent">
-          <p className="text-sm text-muted-foreground">
-            <strong>Nota:</strong> Los datos mostrados se actualizan en tiempo real. 
-            Los reportes incluyen información detallada de todas las sesiones del día seleccionado.
-          </p>
+        {/* Navigation Tabs */}
+        <div className="flex space-x-1 mb-6 bg-muted rounded-lg p-1">
+          {[
+            { id: 'overview', label: 'Resumen', icon: Database },
+            { id: 'sessions', label: 'Historial', icon: MessageSquare },
+            { id: 'logs', label: 'Logs Técnicos', icon: Calendar }
+          ].map(tab => {
+            const Icon = tab.icon;
+            return (
+              <Button
+                key={tab.id}
+                variant={activeTab === tab.id ? 'default' : 'ghost'}
+                onClick={() => setActiveTab(tab.id as any)}
+                className="flex-1"
+              >
+                <Icon className="w-4 h-4 mr-2" />
+                {tab.label}
+              </Button>
+            );
+          })}
         </div>
+
+        {/* Content */}
+        {activeTab === 'overview' && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Sesión Actual</CardTitle>
+                <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{currentChat.length}</div>
+                <p className="text-xs text-muted-foreground">mensajes intercambiados</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Historial Total</CardTitle>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{legacyHistory.length}</div>
+                <p className="text-xs text-muted-foreground">consultas guardadas</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Usuario Activo</CardTitle>
+                <User className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-lg font-bold truncate">{userEmail.split('@')[0]}</div>
+                <p className="text-xs text-muted-foreground">@iespecialidades.com</p>
+              </CardContent>
+            </Card>
+
+            <Card className="md:col-span-3">
+              <CardHeader>
+                <CardTitle>Estado del Sistema</CardTitle>
+                <CardDescription>
+                  Información técnica y configuración actual
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div className="space-y-1">
+                    <p className="font-medium">Modo de Operación</p>
+                    <p className="text-muted-foreground">{appMode.toUpperCase()}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-medium">Estado Backend</p>
+                    <p className="text-muted-foreground">
+                      {appMode === 'mock' ? 'Simulado' : 'Conectado'}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-medium">Almacenamiento</p>
+                    <p className="text-muted-foreground">localStorage</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-medium">Última Actividad</p>
+                    <p className="text-muted-foreground">
+                      {currentChat.length > 0 
+                        ? new Date(currentChat[currentChat.length - 1].timestamp).toLocaleTimeString()
+                        : 'Sin actividad'
+                      }
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === 'sessions' && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Historial de Consultas</CardTitle>
+                <CardDescription>
+                  Registro completo de preguntas y respuestas ({legacyHistory.length} entradas)
+                </CardDescription>
+              </div>
+              <div className="flex space-x-2">
+                <Button onClick={copyAllLogs} variant="outline" size="sm">
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copiar todo
+                </Button>
+                <Button onClick={downloadLogs} variant="outline" size="sm">
+                  <Download className="w-4 h-4 mr-2" />
+                  Descargar
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-96">
+                <div className="space-y-4">
+                  {legacyHistory.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">
+                      No hay historial de consultas guardado
+                    </p>
+                  ) : (
+                    legacyHistory.map((entry, index) => (
+                      <div key={index} className="border rounded-lg p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Badge variant="outline">{entry.fecha}</Badge>
+                          <Badge variant="secondary">{entry.gptUsado}</Badge>
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">Pregunta:</p>
+                          <p className="text-sm text-muted-foreground">{entry.pregunta}</p>
+                        </div>
+                        <Separator />
+                        <div>
+                          <p className="font-medium text-sm">Respuesta:</p>
+                          <p className="text-sm text-muted-foreground line-clamp-3">{entry.respuesta}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === 'logs' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Logs Técnicos</CardTitle>
+              <CardDescription>
+                Información detallada del sistema y sesión actual
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-medium mb-2">Sesión Actual</h3>
+                  <div className="bg-muted rounded-lg p-4 font-mono text-sm">
+                    <pre>{JSON.stringify({
+                      usuario: userEmail,
+                      modo: appMode,
+                      mensajes: currentChat.length,
+                      ultimaActividad: currentChat.length > 0 
+                        ? new Date(currentChat[currentChat.length - 1].timestamp).toISOString()
+                        : null
+                    }, null, 2)}</pre>
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="font-medium mb-2">Estadísticas</h3>
+                  <div className="bg-muted rounded-lg p-4 font-mono text-sm">
+                    <pre>{JSON.stringify({
+                      totalConsultas: legacyHistory.length,
+                      sesionActual: currentChat.length,
+                      promedioMensajesPorConsulta: legacyHistory.length > 0 
+                        ? Math.round(currentChat.length / Math.max(1, legacyHistory.length) * 100) / 100
+                        : 0,
+                      timestamp: new Date().toISOString()
+                    }, null, 2)}</pre>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

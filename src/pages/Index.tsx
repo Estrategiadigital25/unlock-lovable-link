@@ -1,6 +1,6 @@
 import { useState } from "react";
 import LoginScreen from "@/components/LoginScreen";
-import ChatScreen from "@/components/ChatScreen";
+import SimpleChatScreen from "@/components/SimpleChatScreen";
 import AdminPanel from "@/components/AdminPanel";
 
 type Screen = 'login' | 'chat' | 'admin';
@@ -28,7 +28,7 @@ const Index = () => {
     return <AdminPanel onBack={handleBackToChat} />;
   }
 
-  return <ChatScreen onAdminPanel={handleAdminPanel} />;
+  return <SimpleChatScreen onAdminPanel={handleAdminPanel} />;
 };
 
 export default Index;

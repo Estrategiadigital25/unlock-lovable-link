@@ -1,0 +1,417 @@
+import { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Bot, User, Send, Trash2, Upload, Settings, FileText, Copy } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import { getAppMode, generateMockResponse } from "@/lib/appMode";
+import { 
+  getChatHistory, 
+  saveChatHistory, 
+  clearChatHistory, 
+  saveLegacyHistory,
+  saveMockUpload,
+  getUserEmail,
+  type ChatMessage,
+  type MockUpload 
+} from "@/lib/localStorage";
+import TrainingFilesDropzone from "@/components/TrainingFilesDropzone";
+
+interface SimpleChatScreenProps {
+  onAdminPanel: () => void;
+}
+
+const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
+  const [trainingFiles, setTrainingFiles] = useState<any[]>([]);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+  const appMode = getAppMode();
+  const userEmail = getUserEmail();
+
+  // Cargar historial al iniciar
+  useEffect(() => {
+    const history = getChatHistory();
+    setMessages(history);
+  }, []);
+
+  // Auto-scroll al final
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Enviar mensaje
+  const sendMessage = async () => {
+    const message = inputValue.trim();
+    if (!message || isLoading) return;
+
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content: message,
+      timestamp: Date.now()
+    };
+
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
+    setInputValue('');
+    setIsLoading(true);
+
+    try {
+      let assistantResponse: string;
+
+      if (appMode === 'mock') {
+        // Simular respuesta en modo mock
+        await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+        assistantResponse = generateMockResponse(message);
+      } else {
+        // TODO: Llamar a API real en modo prod
+        assistantResponse = "API real no implementada aún";
+      }
+
+      const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        content: assistantResponse,
+        timestamp: Date.now()
+      };
+
+      const finalMessages = [...newMessages, assistantMessage];
+      setMessages(finalMessages);
+      saveChatHistory(finalMessages);
+
+      // Guardar en historial legacy para compatibilidad
+      saveLegacyHistory({
+        fecha: new Date().toISOString().split('T')[0],
+        gptUsado: appMode === 'mock' ? 'ChatGPT (mock)' : 'ChatGPT',
+        pregunta: message,
+        respuesta: assistantResponse
+      });
+
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo procesar tu mensaje. Inténtalo de nuevo.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Limpiar historial
+  const handleClearHistory = () => {
+    clearChatHistory();
+    setMessages([]);
+    toast({
+      title: "Historial limpiado",
+      description: "Se ha eliminado todo el historial de conversación.",
+    });
+  };
+
+  // Manejar upload de archivos (mock)
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadStatus('uploading');
+
+    try {
+      const file = files[0];
+      
+      if (appMode === 'mock') {
+        // Simular subida
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        const mockUpload: MockUpload = {
+          key: `mock/${Date.now()}_${file.name}`,
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          timestamp: Date.now()
+        };
+        
+        saveMockUpload(mockUpload);
+        setUploadStatus('done');
+        
+        toast({
+          title: "Archivo subido (mock)",
+          description: `${file.name} se ha simulado correctamente`,
+        });
+      } else {
+        // TODO: Implementar subida real
+        setUploadStatus('error');
+        toast({
+          title: "Error",
+          description: "Subida real no implementada aún",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      setUploadStatus('error');
+      toast({
+        title: "Error de subida",
+        description: "No se pudo subir el archivo",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Copiar conversación
+  const copyConversation = () => {
+    const conversationText = messages.map(msg => 
+      `${msg.role === 'user' ? 'Usuario' : 'Asistente'}: ${msg.content}`
+    ).join('\n\n');
+    
+    navigator.clipboard.writeText(conversationText).then(() => {
+      toast({
+        title: "Copiado",
+        description: "La conversación se ha copiado al portapapeles.",
+      });
+    });
+  };
+
+  return (
+    <div className="flex h-screen bg-background font-montserrat">
+      {/* Panel lateral */}
+      <div className="w-80 bg-card border-r border-border flex flex-col">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <img src="/lovable-uploads/4c7e0a4b-080a-437a-b8e8-bb34ebe70495.png" alt="Ingtec" className="w-8 h-8" />
+              <div>
+                <h2 className="font-bold text-lg">Buscador GPT</h2>
+                <p className="text-xs text-muted-foreground">Ingtec Especialidades</p>
+              </div>
+            </div>
+            <Badge variant="secondary" className="text-xs">
+              {appMode === 'mock' ? 'MOCK' : 'PROD'}
+            </Badge>
+          </div>
+        </CardHeader>
+
+        <CardContent className="flex-1 space-y-4">
+          {/* Info del usuario */}
+          <div className="p-3 bg-muted/50 rounded-lg">
+            <p className="text-sm font-medium">Usuario activo:</p>
+            <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
+          </div>
+
+          {/* Estadísticas */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Sesión actual:</p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="p-2 bg-primary/10 rounded text-center">
+                <div className="font-bold">{messages.length}</div>
+                <div className="text-muted-foreground">Mensajes</div>
+              </div>
+              <div className="p-2 bg-secondary/10 rounded text-center">
+                <div className="font-bold">{Math.floor(messages.length / 2)}</div>
+                <div className="text-muted-foreground">Consultas</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Acciones */}
+          <div className="space-y-2">
+            <Button
+              onClick={handleClearHistory}
+              variant="outline"
+              size="sm"
+              className="w-full justify-start"
+              disabled={messages.length === 0}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Limpiar historial
+            </Button>
+
+            <Button
+              onClick={copyConversation}
+              variant="outline"
+              size="sm"
+              className="w-full justify-start"
+              disabled={messages.length === 0}
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              Copiar conversación
+            </Button>
+
+            <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="w-full justify-start">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Configuración
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Configuración del Sistema</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-medium mb-2">Variables del Sistema</h3>
+                    <div className="space-y-2 text-sm font-mono">
+                      <div className="flex justify-between p-2 bg-muted rounded">
+                        <span>VITE_MODE</span>
+                        <span>{appMode}</span>
+                      </div>
+                      <div className="flex justify-between p-2 bg-muted rounded">
+                        <span>Email</span>
+                        <span className="truncate max-w-48">{userEmail}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {appMode === 'mock' && (
+                    <div>
+                      <h3 className="font-medium mb-2">Entrenamiento (Mock)</h3>
+                      <TrainingFilesDropzone
+                        presignEndpoint=""
+                        onChange={setTrainingFiles}
+                        maxFiles={5}
+                        maxSizeMB={10}
+                      />
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Button
+              onClick={onAdminPanel}
+              variant="outline"
+              size="sm"
+              className="w-full justify-start"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Panel Admin
+            </Button>
+          </div>
+        </CardContent>
+      </div>
+
+      {/* Área de chat */}
+      <div className="flex-1 flex flex-col">
+        {/* Header del chat */}
+        <div className="border-b border-border p-4 bg-card">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold">Chat con Asistente IA</h1>
+              <p className="text-sm text-muted-foreground">
+                Especializado en consultas técnicas de Ingtec
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                onChange={handleFileUpload}
+                className="hidden"
+                accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                variant="outline"
+                size="sm"
+                disabled={uploadStatus === 'uploading'}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                {uploadStatus === 'uploading' ? 'Subiendo...' : 'Subir archivo'}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mensajes */}
+        <ScrollArea className="flex-1 p-4">
+          <div className="space-y-4 max-w-4xl mx-auto">
+            {messages.length === 0 ? (
+              <div className="text-center py-12">
+                <Bot className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-medium">¡Hola! Soy tu asistente de Ingtec</h3>
+                <p className="text-muted-foreground mt-2 max-w-md mx-auto">
+                  Puedo ayudarte con consultas técnicas, formulaciones, procesos y análisis especializado.
+                  {appMode === 'mock' && <span className="block mt-1 text-primary font-medium">(Funcionando en modo simulado)</span>}
+                </p>
+              </div>
+            ) : (
+              messages.map((message, index) => (
+                <div key={index} className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  {message.role === 'assistant' && (
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Bot className="w-4 h-4 text-primary" />
+                    </div>
+                  )}
+                  <div className={`max-w-2xl p-4 rounded-lg ${
+                    message.role === 'user' 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'bg-muted'
+                  }`}>
+                    <p className="whitespace-pre-wrap">{message.content}</p>
+                    <p className="text-xs opacity-70 mt-2">
+                      {new Date(message.timestamp).toLocaleTimeString()}
+                    </p>
+                  </div>
+                  {message.role === 'user' && (
+                    <div className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center">
+                      <User className="w-4 h-4 text-secondary" />
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+            {isLoading && (
+              <div className="flex gap-3 justify-start">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Bot className="w-4 h-4 text-primary" />
+                </div>
+                <div className="max-w-2xl p-4 rounded-lg bg-muted">
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-primary/50 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-primary/50 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-2 h-2 bg-primary/50 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        </ScrollArea>
+
+        {/* Input de mensaje */}
+        <div className="border-t border-border p-4 bg-card">
+          <div className="max-w-4xl mx-auto flex gap-2">
+            <Input
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="Escribe tu consulta técnica aquí..."
+              onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), sendMessage())}
+              disabled={isLoading}
+              className="flex-1"
+            />
+            <Button 
+              onClick={sendMessage} 
+              disabled={!inputValue.trim() || isLoading}
+              className="px-6"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground text-center mt-2">
+            Presiona Enter para enviar • Shift + Enter para nueva línea
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default SimpleChatScreen;

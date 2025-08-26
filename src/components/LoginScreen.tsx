@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
+import { getAppMode, isValidIngrecEmail } from "@/lib/appMode";
+import { saveUserEmail } from "@/lib/localStorage";
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -11,8 +13,9 @@ interface LoginScreenProps {
 const LoginScreen = ({ onLogin }: LoginScreenProps) => {
   const [email, setEmail] = useState('');
   const { toast } = useToast();
+  const appMode = getAppMode();
 
-  // Lista de emails autorizados
+  // Lista de emails autorizados (solo para mock mode - en prod usaría Cognito)
   const authorizedEmails = [
     'liderdesarrollo@iespecialidades.com',
     'estrategiadigital@iespecialidades.com',
@@ -47,7 +50,9 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
   ];
 
   const handleLogin = () => {
-    if (!email.trim()) {
+    const trimmedEmail = email.trim().toLowerCase();
+    
+    if (!trimmedEmail) {
       toast({
         title: "Error",
         description: "Por favor ingresa tu email corporativo.",
@@ -56,7 +61,18 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
       return;
     }
 
-    if (!authorizedEmails.includes(email.toLowerCase())) {
+    // Validación del dominio corporativo
+    if (!isValidIngrecEmail(trimmedEmail)) {
+      toast({
+        title: "Acceso denegado",
+        description: "Usa un correo @iespecialidades.com válido.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // En modo mock, validar contra lista de emails autorizados
+    if (appMode === 'mock' && !authorizedEmails.includes(trimmedEmail)) {
       toast({
         title: "Acceso denegado",
         description: "Tu email no está autorizado. Solo cuentas @iespecialidades.com registradas pueden acceder.",
@@ -65,8 +81,14 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
       return;
     }
 
-    // Guardar email en localStorage para futuras referencias
-    localStorage.setItem('userEmail', email);
+    // Guardar email y proceder
+    saveUserEmail(trimmedEmail);
+    
+    toast({
+      title: `Acceso autorizado ${appMode === 'mock' ? '(modo mock)' : ''}`,
+      description: `Bienvenido al Buscador GPT de Ingtec.`,
+    });
+    
     onLogin();
   };
 
@@ -129,7 +151,7 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
               
               <Button 
                 onClick={handleLogin}
-                className="w-full h-14 rounded-[20px] bg-gradient-to-r from-[#a7db74] to-[#a7db74] hover:from-[#a7db74]/80 hover:to-[#a7db74]/80 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                className="w-full h-14 rounded-[20px] bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
               >
                 <span className="mr-2">✓</span>
                 Validar identidad y acceder
