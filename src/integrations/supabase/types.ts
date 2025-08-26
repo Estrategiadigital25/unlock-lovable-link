@@ -7,90 +7,14 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
+  // Allows to automatically instanciate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
   }
   public: {
     Tables: {
-      custom_gpts: {
-        Row: {
-          created_at: string
-          description: string | null
-          icon: string | null
-          id: string
-          instructions: string
-          name: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          icon?: string | null
-          id?: string
-          instructions: string
-          name: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          icon?: string | null
-          id?: string
-          instructions?: string
-          name?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      gpt_training_files: {
-        Row: {
-          created_at: string
-          file_name: string
-          file_size: number
-          file_type: string
-          gpt_id: string
-          id: string
-          original_url: string | null
-          processed_content: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          file_name: string
-          file_size: number
-          file_type: string
-          gpt_id: string
-          id?: string
-          original_url?: string | null
-          processed_content?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          file_name?: string
-          file_size?: number
-          file_type?: string
-          gpt_id?: string
-          id?: string
-          original_url?: string | null
-          processed_content?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "gpt_training_files_gpt_id_fkey"
-            columns: ["gpt_id"]
-            isOneToOne: false
-            referencedRelation: "custom_gpts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Views: {
       [_ in never]: never

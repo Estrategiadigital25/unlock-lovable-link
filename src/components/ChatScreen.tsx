@@ -8,13 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Download, Copy, Edit, Settings, Plus, Paperclip, Image, FileText, Trash2, Bot, User, Upload, X } from "lucide-react";
+import { Download, Copy, Edit, Settings, Plus, Paperclip, Image, FileText, Trash2, Bot, User } from "lucide-react";
 import jsPDF from 'jspdf';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { useToast } from "@/components/ui/use-toast";
 import { detectMode, type Mode } from "@/lib/promptOptimizer";
 import { askChat, type ChatMessage } from "@/lib/api";
-import { supabase } from '@/integrations/supabase/client';
 
 interface ChatScreenProps {
   onAdminPanel: () => void;
@@ -51,22 +50,7 @@ interface CustomGPT {
   description: string;
   instructions: string;
   icon: string;
-  user_id?: string;
-  created_at?: string;
-  updated_at?: string;
   isDefault?: boolean;
-}
-
-interface TrainingFile {
-  id: string;
-  gpt_id: string;
-  user_id: string;
-  file_name: string;
-  file_type: string;
-  file_size: number;
-  original_url: string | null;
-  processed_content: string | null;
-  created_at: string;
 }
 
 const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
@@ -87,13 +71,9 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   const [newGPTInstructions, setNewGPTInstructions] = useState('');
   const [testInput, setTestInput] = useState('');
   const [testOutput, setTestOutput] = useState('');
-  const [currentGPTFiles, setCurrentGPTFiles] = useState<TrainingFile[]>([]);
-  const [isUploadingFile, setIsUploadingFile] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
   
   const [mode, setMode] = useState<Mode>('AUTO');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const trainingFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // GPT principal para todas las búsquedas
@@ -108,359 +88,208 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
     }
   ];
 
-  // Cargar datos y verificar autenticación
-  useEffect(() => {
-    loadFromLocalStorage();
-    checkUser();
-  }, []);
+  // Cargar datos del localStorage al iniciar
+  // Cargar datos del localStorage al iniciar
+useEffect(() => {
+  const savedConversations = localStorage.getItem('conversations');
+  const savedGPTs = localStorage.getItem('custom_gpts');
 
-  const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    setCurrentUser(user);
-    if (user) {
-      loadCustomGPTs();
-    }
-  };
-
-  const loadFromLocalStorage = () => {
-    const savedConversations = localStorage.getItem('conversations');
-    
-    if (savedConversations) {
-      try {
-        const parsedConversations = JSON.parse(savedConversations).map((conv: any) => ({
-          ...conv,
-          createdAt: new Date(conv.createdAt),
-          updatedAt: new Date(conv.updatedAt),
-          messages: conv.messages.map((msg: any) => ({
-            ...msg,
-            timestamp: new Date(msg.timestamp)
-          }))
-        }));
-        setConversations(parsedConversations);
-      } catch (error) {
-        console.error('Error loading conversations:', error);
-      }
-    }
-  };
-
-  const loadCustomGPTs = async () => {
-    if (!currentUser) return;
-
+  if (savedConversations) {
     try {
-      const { data: gpts, error } = await supabase
-        .from('custom_gpts')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setCustomGPTs(gpts || []);
+      const parsedConversations = JSON.parse(savedConversations).map((conv: any) => ({
+        ...conv,
+        createdAt: new Date(conv.createdAt),
+        updatedAt: new Date(conv.updatedAt),
+        messages: conv.messages.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        }))
+      }));
+      setConversations(parsedConversations);
     } catch (error) {
-      console.error('Error loading custom GPTs:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los GPTs personalizados.",
-        variant: "destructive"
-      });
+      console.error('Error loading conversations:', error);
     }
-  };
+  }
 
-  const loadGPTFiles = async (gptId: string) => {
-    if (!currentUser) return;
-
+  if (savedGPTs) {
     try {
-      const { data: files, error } = await supabase
-        .from('gpt_training_files')
-        .select('*')
-        .eq('gpt_id', gptId)
-        .eq('user_id', currentUser.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setCurrentGPTFiles(files || []);
+      setCustomGPTs(JSON.parse(savedGPTs));
     } catch (error) {
-      console.error('Error loading GPT files:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los archivos del GPT.",
-        variant: "destructive"
-      });
+      console.error('Error loading GPTs:', error);
     }
-  };
+  }
 
-  // Manejar archivos de entrenamiento
-  const handleTrainingFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, gptId: string) => {
-    const files = event.target.files;
-    if (!files || !currentUser) return;
+  // ✅ NUEVO: cargar preguntas del historial para habilitar el botón
+  try {
+    const hist = JSON.parse(localStorage.getItem('historialGPT') || '[]');
+    setHistorialBusquedas(Array.isArray(hist) ? hist.map((i: any) => i.pregunta) : []);
+  } catch {
+    setHistorialBusquedas([]);
+  }
+}, []);
 
-    setIsUploadingFile(true);
 
-    for (const file of Array.from(files)) {
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('gptId', gptId);
-
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        const response = await fetch(`https://lozhxacampqoxmjbnekf.supabase.co/functions/v1/process-file`, {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'Authorization': `Bearer ${session?.access_token}`,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error('Error procesando archivo');
-        }
-
-        const result = await response.json();
-        
-        toast({
-          title: "Archivo procesado",
-          description: `${file.name} se procesó correctamente (${result.contentLength} caracteres extraídos).`,
-        });
-
-        // Recargar archivos
-        await loadGPTFiles(gptId);
-
-      } catch (error) {
-        console.error('Error uploading file:', error);
-        toast({
-          title: "Error",
-          description: `No se pudo procesar ${file.name}.`,
-          variant: "destructive"
-        });
-      }
-    }
-
-    setIsUploadingFile(false);
-    // Reset input
-    if (trainingFileInputRef.current) {
-      trainingFileInputRef.current.value = '';
-    }
-  };
-
-  const deleteTrainingFile = async (fileId: string) => {
-    if (!currentUser) return;
-
-    try {
-      const { error } = await supabase
-        .from('gpt_training_files')
-        .delete()
-        .eq('id', fileId)
-        .eq('user_id', currentUser.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Archivo eliminado",
-        description: "El archivo se eliminó correctamente.",
-      });
-
-      // Recargar archivos
-      const gptId = currentGPTFiles.find(f => f.id === fileId)?.gpt_id;
-      if (gptId) {
-        await loadGPTFiles(gptId);
-      }
-    } catch (error) {
-      console.error('Error deleting file:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el archivo.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Manejo de conversaciones
+  // Generar título automático basado en el primer mensaje
   const generateAutoTitle = (firstMessage: string): string => {
-    const words = firstMessage.split(' ').slice(0, 6);
+    const words = firstMessage.trim().split(' ').slice(0, 6);
     return words.join(' ') + (firstMessage.split(' ').length > 6 ? '...' : '');
   };
 
+  // Guardar conversación actual
   const saveCurrentConversation = () => {
     if (messages.length === 0) return;
 
-    const conversationToSave = {
-      id: currentConversationId || Date.now().toString(),
-      title: currentConversationId 
-        ? conversations.find(c => c.id === currentConversationId)?.title || generateAutoTitle(messages[0]?.content || '')
-        : generateAutoTitle(messages[0]?.content || ''),
-      messages: messages,
-      createdAt: currentConversationId 
-        ? conversations.find(c => c.id === currentConversationId)?.createdAt || new Date()
-        : new Date(),
-      updatedAt: new Date()
-    };
+    const now = new Date();
+    let conversation: Conversation;
 
-    const updatedConversations = currentConversationId
-      ? conversations.map(c => c.id === currentConversationId ? conversationToSave : c)
-      : [conversationToSave, ...conversations];
+    if (currentConversationId) {
+      // Actualizar conversación existente
+      conversation = {
+        id: currentConversationId,
+        title: conversations.find(c => c.id === currentConversationId)?.title || generateAutoTitle(messages[0]?.content || ''),
+        messages: messages,
+        createdAt: conversations.find(c => c.id === currentConversationId)?.createdAt || now,
+        updatedAt: now
+      };
+    } else {
+      // Crear nueva conversación
+      conversation = {
+        id: Date.now().toString(),
+        title: generateAutoTitle(messages[0]?.content || 'Nueva conversación'),
+        messages: messages,
+        createdAt: now,
+        updatedAt: now
+      };
+      setCurrentConversationId(conversation.id);
+    }
 
+    const updatedConversations = conversations.filter(c => c.id !== conversation.id);
+    updatedConversations.unshift(conversation);
     setConversations(updatedConversations);
     localStorage.setItem('conversations', JSON.stringify(updatedConversations));
-    setCurrentConversationId(conversationToSave.id);
   };
 
-  // Crear GPT personalizado
-  const createCustomGPT = async () => {
-    if (!newGPTName.trim() || !newGPTInstructions.trim() || !currentUser) {
-      toast({
-        title: "Error",
-        description: "El nombre, las instrucciones y la autenticación son obligatorios.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      const { data: newGPT, error } = await supabase
-        .from('custom_gpts')
-        .insert({
-          user_id: currentUser.id,
-          name: newGPTName,
-          description: newGPTDescription || 'GPT personalizado',
-          instructions: newGPTInstructions,
-          icon: '🤖'
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setCustomGPTs(prev => [newGPT, ...prev]);
-      
-      setNewGPTName('');
-      setNewGPTDescription('');
-      setNewGPTInstructions('');
-      setTestInput('');
-      setTestOutput('');
-      setIsCreatingGPT(false);
-
-      toast({
-        title: "GPT creado",
-        description: `Se ha creado el GPT "${newGPT.name}" exitosamente.`,
-      });
-    } catch (error) {
-      console.error('Error creating GPT:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo crear el GPT personalizado.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const deleteCustomGPT = async (gptId: string) => {
-    if (!currentUser) return;
-
-    try {
-      const { error } = await supabase
-        .from('custom_gpts')
-        .delete()
-        .eq('id', gptId)
-        .eq('user_id', currentUser.id);
-
-      if (error) throw error;
-
-      setCustomGPTs(prev => prev.filter(gpt => gpt.id !== gptId));
-
-      toast({
-        title: "GPT eliminado",
-        description: "El GPT personalizado se eliminó correctamente.",
-      });
-    } catch (error) {
-      console.error('Error deleting GPT:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el GPT.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Manejar envío de mensajes con contexto de archivos
-  const handleSendMessage = async () => {
-    if (!inputValue.trim()) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      type: 'user',
-      content: inputValue,
-      timestamp: new Date(),
-      attachments: attachments.length > 0 ? [...attachments] : undefined,
-      gptUsed: 'Usuario'
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-
-    // limpiar input/adjuntos
-    setInputValue('');
-    setAttachments([]);
-
-    const finalMode = mode === 'AUTO' ? detectMode(userMessage.content) : mode;
-    
-    try {
-      // Obtener contexto de archivos si hay un GPT personalizado seleccionado
-      let contextualizedPrompt = userMessage.content;
-      
-      if (selectedGPT !== 'gpt4' && currentUser) {
-        const selectedCustomGPT = customGPTs.find(gpt => gpt.id === selectedGPT);
-        if (selectedCustomGPT) {
-          // Obtener archivos de entrenamiento
-          const { data: trainingFiles } = await supabase
-            .from('gpt_training_files')
-            .select('processed_content')
-            .eq('gpt_id', selectedGPT)
-            .eq('user_id', currentUser.id);
-
-          if (trainingFiles && trainingFiles.length > 0) {
-            const trainingContext = trainingFiles
-              .map(file => file.processed_content)
-              .filter(content => content && content.trim())
-              .join('\n\n');
-
-            if (trainingContext) {
-              contextualizedPrompt = `Contexto de entrenamiento:\n${trainingContext}\n\nInstrucciones del GPT: ${selectedCustomGPT.instructions}\n\nConsulta del usuario: ${userMessage.content}`;
-            } else {
-              contextualizedPrompt = `Instrucciones del GPT: ${selectedCustomGPT.instructions}\n\nConsulta del usuario: ${userMessage.content}`;
-            }
-          } else {
-            contextualizedPrompt = `Instrucciones del GPT: ${selectedCustomGPT.instructions}\n\nConsulta del usuario: ${userMessage.content}`;
-          }
-        }
-      }
-
-      const chatMessages: ChatMessage[] = [
-        { role: 'user', content: contextualizedPrompt }
-      ];
-
-      const respuesta = await askChat(chatMessages);
-
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: respuesta,
-        timestamp: new Date(),
-        gptUsed: selectedGPT === 'gpt4' ? 'ChatGPT' : customGPTs.find(gpt => gpt.id === selectedGPT)?.name || 'GPT Personalizado'
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
+  const handleNewSearch = () => {
+    // Guardar conversación actual si existe
+    if (messages.length > 0) {
       saveCurrentConversation();
-      
-    } catch (error) {
-      console.error('Error sending message:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo enviar el mensaje. Verifica tu conexión.",
-        variant: "destructive"
-      });
+    }
+
+    // Limpiar chat actual
+    setMessages([]);
+    setAttachments([]);
+    setInputValue('');
+    setMode('AUTO');
+    setCurrentConversationId(null);
+    setIsNewChatOpen(false);
+    
+    toast({
+      title: "Nueva búsqueda iniciada",
+      description: "El chat ha sido limpiado para empezar una nueva conversación.",
+    });
+  };
+
+  // Cargar una conversación existente
+  const loadConversation = (conversationId: string) => {
+    // Guardar conversación actual primero
+    if (messages.length > 0) {
+      saveCurrentConversation();
+    }
+
+    const conversation = conversations.find(c => c.id === conversationId);
+    if (conversation) {
+      setMessages(conversation.messages);
+      setCurrentConversationId(conversationId);
+      setAttachments([]);
+      setInputValue('');
     }
   };
 
-  // Manejar carga de archivos adjuntos en mensajes
+  // Editar título de conversación
+  const startEditingTitle = (conversationId: string, currentTitle: string) => {
+    setEditingTitleId(conversationId);
+    setEditingTitleValue(currentTitle);
+  };
+
+  const saveEditedTitle = () => {
+    if (!editingTitleId) return;
+
+    const updatedConversations = conversations.map(conv => 
+      conv.id === editingTitleId 
+        ? { ...conv, title: editingTitleValue.trim() || 'Sin título', updatedAt: new Date() }
+        : conv
+    );
+    
+    setConversations(updatedConversations);
+    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
+    setEditingTitleId(null);
+    setEditingTitleValue('');
+  };
+
+  const cancelEditingTitle = () => {
+    setEditingTitleId(null);
+    setEditingTitleValue('');
+  };
+
+  // Eliminar conversación
+  const deleteConversation = (conversationId: string) => {
+    const updatedConversations = conversations.filter(c => c.id !== conversationId);
+    setConversations(updatedConversations);
+    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
+    
+    // Si era la conversación actual, limpiar
+    if (currentConversationId === conversationId) {
+      setMessages([]);
+      setCurrentConversationId(null);
+    }
+    
+    toast({
+      title: "Conversación eliminada",
+      description: "La conversación ha sido eliminada del historial.",
+    });
+  };
+
+  // Función para guardar en historial legacy
+  const saveToHistory = (pregunta: string, respuesta: string) => {
+    try {
+      const historial = JSON.parse(localStorage.getItem("historialGPT") || "[]");
+      const nuevoItem = {
+        fecha: new Date().toISOString().split('T')[0],
+        gptUsado: mode === 'SIN ASISTENTE' ? 'ChatGPT' : 'Asistente Ingtec',
+        pregunta: pregunta,
+        respuesta: respuesta
+      };
+      historial.unshift(nuevoItem);
+      localStorage.setItem("historialGPT", JSON.stringify(historial));
+    } catch (error) {
+      console.error('Error saving to history:', error);
+    }
+  };
+
+
+  // Limpiar historial
+  const clearHistory = () => {
+    // Limpiar conversaciones
+    setConversations([]);
+    localStorage.removeItem('conversations');
+    
+    // Limpiar historial antiguo
+    setHistorialBusquedas([]);
+    localStorage.removeItem("historialGPT");
+    
+    // Limpiar chat actual
+    setMessages([]);
+    setCurrentConversationId(null);
+    setAttachments([]);
+    setInputValue('');
+    
+    toast({
+      title: "Historial limpiado",
+      description: "Se ha eliminado todo el historial de búsquedas y conversaciones.",
+    });
+  };
+
+  // Manejar archivos
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files) return;
@@ -478,8 +307,8 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
     });
 
     toast({
-      title: "Archivos adjuntos",
-      description: `Se han adjuntado ${files.length} archivo(s) al mensaje.`,
+      title: "Archivos cargados",
+      description: `Se han cargado ${files.length} archivo(s) exitosamente.`,
     });
   };
 
@@ -487,353 +316,560 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
     setAttachments(prev => prev.filter(att => att.id !== id));
   };
 
-  const allGPTs = [...defaultGPTs, ...customGPTs];
+  // Función para copiar conversación
+  const copyConversation = () => {
+    const conversationText = messages.map(msg => 
+      `${msg.type === 'user' ? 'Usuario' : 'Asistente'}: ${msg.content}`
+    ).join('\n\n');
+    
+    navigator.clipboard.writeText(conversationText).then(() => {
+      toast({
+        title: "Copiado",
+        description: "La conversación se ha copiado al portapapeles.",
+      });
+    }).catch(() => {
+      toast({
+        title: "Error",
+        description: "No se pudo copiar la conversación.",
+        variant: "destructive"
+      });
+    });
+  };
+
+  // Función para descargar conversación actual
+  const downloadConversation = async (format: 'txt' | 'docx' | 'pdf') => {
+    if (messages.length === 0) {
+      toast({
+        title: "Aviso",
+        description: "No hay conversación para descargar",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const conversationData = {
+      fecha: new Date().toISOString().split('T')[0],
+      gptUsado: selectedGPT,
+      titulo: conversations.find(c => c.id === currentConversationId)?.title || 'Conversación actual',
+      mensajes: messages
+    };
+    
+    if (format === 'txt') {
+      const content = `Fecha: ${conversationData.fecha}\nGPT: ${conversationData.gptUsado}\nTítulo: ${conversationData.titulo}\n\n${'='.repeat(50)}\n\n` +
+        messages.map(msg => 
+          `${msg.type === 'user' ? 'Usuario' : 'Asistente'}: ${msg.content}\n`
+        ).join('\n');
+      
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `conversacion_${new Date().toISOString().split('T')[0]}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Descarga completada",
+        description: "La conversación se ha descargado como archivo .txt",
+      });
+    } else if (format === 'docx') {
+      try {
+        console.log('Iniciando generación de .docx...');
+        console.log('Mensajes en conversación:', messages.length);
+        
+        // Crear contenido del documento
+        const children = [
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Fecha: ${conversationData.fecha}`, bold: true }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `GPT: ${conversationData.gptUsado}`, bold: true }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Título: ${conversationData.titulo}`, bold: true }),
+            ],
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: "" })],
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: "=".repeat(50) })],
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: "" })],
+          }),
+          ...messages.flatMap((msg, index) => [
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:`, 
+                  bold: true 
+                }),
+              ],
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: msg.content }),
+              ],
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: "" })],
+            }),
+          ])
+        ];
+
+        console.log('Elementos creados:', children.length);
+
+        // Crear documento
+        const doc = new Document({
+          sections: [{
+            properties: {},
+            children: children,
+          }],
+        });
+
+        console.log('Documento creado, generando blob...');
+        const blob = await Packer.toBlob(doc);
+        console.log('Blob generado, tamaño:', blob.size);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `conversacion_${new Date().toISOString().split('T')[0]}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        console.log('Descarga iniciada exitosamente');
+        toast({
+          title: "Descarga completada",
+          description: "La conversación se ha descargado como archivo .docx",
+        });
+      } catch (error) {
+        console.error('Error generando .docx:', error);
+        toast({
+          title: "Error",
+          description: `Error al generar .docx: ${error instanceof Error ? error.message : 'Error desconocido'}`,
+          variant: "destructive"
+        });
+      }
+    } else if (format === 'pdf') {
+      try {
+        const pdf = new jsPDF();
+        let yPosition = 20;
+        
+        // Encabezado
+        pdf.setFontSize(14);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(`Conversación - ${conversationData.fecha}`, 10, yPosition);
+        yPosition += 10;
+        
+        pdf.setFontSize(12);
+        pdf.text(`GPT: ${conversationData.gptUsado}`, 10, yPosition);
+        yPosition += 10;
+        
+        pdf.text(`Título: ${conversationData.titulo}`, 10, yPosition);
+        yPosition += 20;
+        
+        pdf.text(''.padEnd(50, '='), 10, yPosition);
+        yPosition += 15;
+        
+        messages.forEach((msg, index) => {
+          if (yPosition > 260) {
+            pdf.addPage();
+            yPosition = 20;
+          }
+          
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(`${msg.type === 'user' ? 'Usuario' : 'Asistente'}:`, 10, yPosition);
+          yPosition += 10;
+          
+          pdf.setFont('helvetica', 'normal');
+          const lines = pdf.splitTextToSize(msg.content, 180);
+          pdf.text(lines, 10, yPosition);
+          yPosition += lines.length * 7 + 10;
+        });
+        
+        pdf.save(`conversacion_${new Date().toISOString().split('T')[0]}.pdf`);
+        
+        toast({
+          title: "Descarga completada",
+          description: "La conversación se ha descargado como archivo .pdf",
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "No se pudo generar el archivo .pdf",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  // Crear nuevo GPT
+  const createCustomGPT = () => {
+    if (!newGPTName.trim() || !newGPTInstructions.trim()) {
+      toast({
+        title: "Error",
+        description: "El nombre y las instrucciones son obligatorios.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newGPT: CustomGPT = {
+      id: Date.now().toString(),
+      name: newGPTName,
+      description: newGPTDescription || 'GPT personalizado',
+      instructions: newGPTInstructions,
+      icon: '🤖'
+    };
+
+    const updatedGPTs = [...customGPTs, newGPT];
+    setCustomGPTs(updatedGPTs);
+    localStorage.setItem('custom_gpts', JSON.stringify(updatedGPTs));
+    
+    setNewGPTName('');
+    setNewGPTDescription('');
+    setNewGPTInstructions('');
+    setTestInput('');
+    setTestOutput('');
+    setIsCreatingGPT(false);
+
+    toast({
+      title: "GPT creado",
+      description: `Se ha creado el GPT "${newGPT.name}" exitosamente.`,
+    });
+  };
+
+  const handleSendMessage = async () => {
+  if (!inputValue.trim()) return;
+
+  // 1) Mensaje del usuario
+  const userMessage: Message = {
+    id: Date.now().toString(),
+    type: 'user',
+    content: inputValue,
+    timestamp: new Date(),
+    attachments: attachments.length > 0 ? [...attachments] : undefined,
+    gptUsed: 'Usuario'
+  };
+
+  const updatedMessages = [...messages, userMessage];
+  setMessages(updatedMessages);
+
+  // limpiar input/adjuntos
+  setInputValue('');
+  setAttachments([]);
+
+  // 2) (solo etiqueta/UX)
+  const finalMode = mode === 'AUTO' ? detectMode(userMessage.content) : mode;
+
+  // 3) Historial para tu API
+  const historyForApi: ChatMessage[] = updatedMessages.map((m) => ({
+    role: m.type === 'assistant' ? 'assistant' : 'user',
+    content: m.content,
+  }));
+
+  try {
+    // 4) Llamada real a tu backend (API Gateway -> Lambda)
+    const replyText = await askChat(historyForApi, "gpt-4o-mini");
+
+    // 5) Mensaje del asistente
+    const assistantMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      type: 'assistant',
+      content: replyText,
+      timestamp: new Date(),
+      gptUsed: finalMode === 'SIN ASISTENTE' ? 'ChatGPT' : 'Asistente Ingtec'
+    };
+
+    setMessages((prev) => [...prev, assistantMessage]);
+
+    // 6) Auto-guardar
+    setTimeout(() => {
+      saveCurrentConversation();
+    }, 100);
+
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const errorMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      type: 'assistant',
+      content: `❌ Error al conectar con el servidor.\n\n${msg}`,
+      timestamp: new Date(),
+      gptUsed: "Error"
+    };
+    setMessages((prev) => [...prev, errorMessage]);
+  }
+};
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Sidebar */}
-      <div className="w-1/4 border-r border-border bg-card p-4 flex flex-col">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-lg">Conversaciones</h2>
-          <Button 
-            variant="outline" 
+    <div className="min-h-screen bg-background font-montserrat flex">
+      {/* Sidebar con historial */}
+      <div className="w-80 bg-card border-r border-border p-4 flex flex-col">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="font-semibold text-foreground">Historial</h3>
+          <Button
+            onClick={onAdminPanel}
+            variant="outline"
             size="sm"
-            onClick={() => {
-              setMessages([]);
-              setCurrentConversationId(null);
-              setAttachments([]);
-              setInputValue('');
-            }}
-            className="rounded-[20px]"
+            className="h-8 w-8 p-0"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Nueva
+            <Settings className="h-4 w-4" />
           </Button>
         </div>
-
-        <ScrollArea className="flex-1 mb-4">
-          {conversations.map((conversation) => (
-            <div
-              key={conversation.id}
-              className={`p-3 rounded-lg cursor-pointer mb-2 transition-colors ${
-                currentConversationId === conversation.id 
-                  ? 'bg-primary/10 border-primary/20 border' 
-                  : 'hover:bg-muted/50'
-              }`}
-              onClick={() => {
-                setMessages(conversation.messages);
-                setCurrentConversationId(conversation.id);
-                setAttachments([]);
-                setInputValue('');
-              }}
-            >
-              <div className="flex items-center justify-between mb-1">
-                {editingTitleId === conversation.id ? (
-                  <Input
-                    value={editingTitleValue}
-                    onChange={(e) => setEditingTitleValue(e.target.value)}
-                    onBlur={() => {
-                      const updatedConversations = conversations.map(c =>
-                        c.id === conversation.id ? { ...c, title: editingTitleValue } : c
-                      );
-                      setConversations(updatedConversations);
-                      localStorage.setItem('conversations', JSON.stringify(updatedConversations));
-                      setEditingTitleId(null);
-                    }}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        const updatedConversations = conversations.map(c =>
-                          c.id === conversation.id ? { ...c, title: editingTitleValue } : c
-                        );
-                        setConversations(updatedConversations);
-                        localStorage.setItem('conversations', JSON.stringify(updatedConversations));
-                        setEditingTitleId(null);
-                      }
-                    }}
-                    className="text-sm h-6"
-                    autoFocus
-                  />
-                ) : (
-                  <span className="font-medium text-sm truncate flex-1">{conversation.title}</span>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditingTitleId(conversation.id);
-                    setEditingTitleValue(conversation.title);
-                  }}
-                  className="h-6 w-6 p-0"
-                >
-                  <Edit className="h-3 w-3" />
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {conversation.updatedAt.toLocaleDateString()} • {conversation.messages.length} mensajes
+        <ScrollArea className="h-[calc(50vh-120px)] flex-shrink-0">
+          <div className="space-y-2">
+            {conversations.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No hay conversaciones guardadas aún
               </p>
-            </div>
-          ))}
-        </ScrollArea>
-
-        <Separator className="mb-4" />
-
-        {/* GPTs Personalizados */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-medium text-sm">GPTs Personalizados</h3>
-            <Dialog open={isCreatingGPT} onOpenChange={setIsCreatingGPT}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="rounded-[20px]">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Crear GPT
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Crear GPT Personalizado</DialogTitle>
-                </DialogHeader>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Panel de configuración */}
-                  <div className="space-y-4">
-                    <h3 className="font-medium text-lg">Configuración</h3>
-                    <div>
-                      <label className="text-sm font-medium">Nombre *</label>
-                      <Input
-                        value={newGPTName}
-                        onChange={(e) => setNewGPTName(e.target.value)}
-                        placeholder="Ej: Asistente Contable"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Descripción</label>
-                      <Input
-                        value={newGPTDescription}
-                        onChange={(e) => setNewGPTDescription(e.target.value)}
-                        placeholder="Describe para qué sirve este GPT"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Instrucciones *</label>
-                      <Textarea
-                        value={newGPTInstructions}
-                        onChange={(e) => setNewGPTInstructions(e.target.value)}
-                        placeholder="Define el comportamiento y especialización del GPT..."
-                        rows={6}
-                      />
-                    </div>
-                    
-                    {/* Área de archivos de entrenamiento */}
-                    {newGPTName && (
-                      <div>
-                        <label className="text-sm font-medium">Archivos de entrenamiento</label>
-                        <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center">
-                          <input
-                            ref={trainingFileInputRef}
-                            type="file"
-                            multiple
-                            accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
-                            onChange={(e) => {
-                              // Esta funcionalidad se activará después de crear el GPT
-                              toast({
-                                title: "Información",
-                                description: "Los archivos se pueden subir después de crear el GPT.",
-                              });
+            ) : (
+              conversations.map((conversation) => (
+                <Card 
+                  key={conversation.id} 
+                  className={`p-3 cursor-pointer hover:bg-accent/50 transition-colors ${
+                    currentConversationId === conversation.id ? 'bg-accent' : ''
+                  }`}
+                  onClick={() => loadConversation(conversation.id)}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      {editingTitleId === conversation.id ? (
+                        <div className="space-y-2">
+                          <Input
+                            value={editingTitleValue}
+                            onChange={(e) => setEditingTitleValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveEditedTitle();
+                              if (e.key === 'Escape') cancelEditingTitle();
                             }}
-                            className="hidden"
+                            onBlur={saveEditedTitle}
+                            className="h-6 text-sm"
+                            autoFocus
                           />
-                          <Paperclip className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground">
-                            Los archivos se subirán después de crear el GPT
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Soporta: PDF, DOC, TXT, JPG, PNG
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-sm font-medium line-clamp-2 mb-1">{conversation.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {conversation.updatedAt.toLocaleDateString('es-ES')} • {conversation.messages.length} mensajes
                           </p>
                         </div>
-
-                        {/* Lista de archivos actuales */}
-                        {currentGPTFiles.length > 0 && (
-                          <div className="mt-4 space-y-2">
-                            <p className="text-sm font-medium">Archivos cargados:</p>
-                            <div className="max-h-32 overflow-y-auto space-y-1">
-                              {currentGPTFiles.map((file) => (
-                                <div key={file.id} className="flex items-center justify-between p-2 bg-muted rounded text-sm">
-                                  <div className="flex items-center gap-2">
-                                    <FileText className="h-4 w-4" />
-                                    <span className="truncate">{file.file_name}</span>
-                                    <Badge variant="secondary" className="text-xs">
-                                      {(file.file_size / 1024).toFixed(1)}KB
-                                    </Badge>
-                                  </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => deleteTrainingFile(file.id)}
-                                    className="h-6 w-6 p-0"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Panel de pruebas */}
-                  <div className="space-y-4">
-                    <h3 className="font-medium text-lg">Acciones</h3>
-                    
-                    <Button 
-                      onClick={createCustomGPT}
-                      className="w-full"
-                      disabled={!newGPTName.trim() || !newGPTInstructions.trim()}
-                    >
-                      Crear GPT Personalizado
-                    </Button>
-                    
-                    <div>
-                      <label className="text-sm font-medium">Vista previa de instrucciones</label>
-                      <div className="border rounded p-3 bg-muted/50 text-sm min-h-[100px]">
-                        {newGPTInstructions || "Las instrucciones aparecerán aquí..."}
-                      </div>
+                      )}
                     </div>
-
-                    {currentUser && (
-                      <div className="text-xs text-muted-foreground p-3 bg-blue-50 dark:bg-blue-900/20 rounded">
-                        <strong>💡 Consejos:</strong>
-                        <ul className="mt-2 space-y-1">
-                          <li>• Sé específico en las instrucciones</li>
-                          <li>• Define el tono y estilo de respuesta</li>
-                          <li>• Menciona qué tipo de consultas debe manejar</li>
-                          <li>• Los archivos de entrenamiento se procesan automáticamente</li>
-                        </ul>
-                      </div>
-                    )}
+                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startEditingTitle(conversation.id, conversation.title);
+                        }}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteConversation(conversation.id);
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+                </Card>
+              ))
+            )}
           </div>
-          
-          <ScrollArea className="max-h-48">
-            {customGPTs.map((gpt) => (
-              <div key={gpt.id} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded group">
-                <div className="flex items-center gap-2 flex-1">
-                  <span className="text-lg">{gpt.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{gpt.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{gpt.description}</p>
-                  </div>
-                </div>
-                <div className="flex gap-1">
+        </ScrollArea>
+        
+        {/* GPTs Personalizados */}
+        {customGPTs.length > 0 && (
+          <div className="mb-4">
+            <h4 className="text-sm font-medium text-foreground mb-2">Mis GPTs</h4>
+            <div className="space-y-2">
+              {customGPTs.map((gpt) => (
+                <div key={gpt.id} className="flex items-center gap-2">
                   <Button
-                    variant="ghost"
+                    variant={selectedGPT === gpt.id ? "default" : "outline"}
                     size="sm"
-                    onClick={() => {
-                      setIsCreatingGPT(true);
-                      loadGPTFiles(gpt.id);
-                      setNewGPTName(gpt.name);
-                      setNewGPTDescription(gpt.description);
-                      setNewGPTInstructions(gpt.instructions);
-                    }}
-                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                    className="flex-1 justify-start text-left"
+                    onClick={() => setSelectedGPT(gpt.id)}
                   >
-                    <Edit className="h-3 w-3" />
+                    <span className="mr-2">{gpt.icon}</span>
+                    <div className="text-left">
+                      <div className="font-medium text-xs">{gpt.name}</div>
+                      <div className="text-xs text-muted-foreground line-clamp-1">{gpt.description}</div>
+                    </div>
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => deleteCustomGPT(gpt.id)}
-                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-destructive"
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Editar GPT</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium">Nombre</label>
+                          <Input 
+                            defaultValue={gpt.name}
+                            onChange={(e) => {
+                              const updatedGPTs = customGPTs.map(g => 
+                                g.id === gpt.id ? { ...g, name: e.target.value } : g
+                              );
+                              setCustomGPTs(updatedGPTs);
+                              localStorage.setItem('custom_gpts', JSON.stringify(updatedGPTs));
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium">Descripción</label>
+                          <Input 
+                            defaultValue={gpt.description}
+                            onChange={(e) => {
+                              const updatedGPTs = customGPTs.map(g => 
+                                g.id === gpt.id ? { ...g, description: e.target.value } : g
+                              );
+                              setCustomGPTs(updatedGPTs);
+                              localStorage.setItem('custom_gpts', JSON.stringify(updatedGPTs));
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium">Instrucciones</label>
+                          <Textarea 
+                            defaultValue={gpt.instructions}
+                            onChange={(e) => {
+                              const updatedGPTs = customGPTs.map(g => 
+                                g.id === gpt.id ? { ...g, instructions: e.target.value } : g
+                              );
+                              setCustomGPTs(updatedGPTs);
+                              localStorage.setItem('custom_gpts', JSON.stringify(updatedGPTs));
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                    onClick={() => {
+                      const updatedGPTs = customGPTs.filter(g => g.id !== gpt.id);
+                      setCustomGPTs(updatedGPTs);
+                      localStorage.setItem('custom_gpts', JSON.stringify(updatedGPTs));
+                      if (selectedGPT === gpt.id) {
+                        setSelectedGPT('gpt4');
+                      }
+                      toast({
+                        title: "GPT eliminado",
+                        description: `Se ha eliminado el GPT "${gpt.name}".`,
+                      });
+                    }}
                   >
                     <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>
-              </div>
-            ))}
-          </ScrollArea>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Botón limpiar historial */}
+        <div className="mt-4 pt-4 border-border">
+          <Button
+            onClick={clearHistory}
+            variant="outline"
+            size="sm"
+            className="w-full border-2 text-white hover:opacity-90"
+            style={{ backgroundColor: '#a7db74', borderColor: '#a7db74' }}
+            disabled={conversations.length === 0 && historialBusquedas.length === 0}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Limpiar historial local
+          </Button>
         </div>
       </div>
 
-      {/* Main Chat Area */}
+      {/* Área principal del chat */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="border-b border-border p-4 bg-card">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold">Buscador GPT - Ingtec Especialidades</h1>
-              <Select value={selectedGPT} onValueChange={setSelectedGPT}>
-                <SelectTrigger className="w-64">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {allGPTs.map((gpt) => (
-                    <SelectItem key={gpt.id} value={gpt.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{gpt.icon}</span>
-                        <span>{gpt.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <div className="bg-card border-b border-border p-6 text-center">
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <div>
+              <img src="/lovable-uploads/4c7e0a4b-080a-437a-b8e8-bb34ebe70495.png" alt="Ingtec Logo" className="w-12 h-12" />
             </div>
-            <Button variant="outline" onClick={onAdminPanel}>
-              <Settings className="h-4 w-4 mr-2" />
-              Admin
-            </Button>
+            <h1 className="text-3xl font-bold text-foreground">
+              Buscador GPT
+            </h1>
           </div>
+          <div className="mb-2">
+            <Badge variant="secondary">Respaldado por la última versión de ChatGPT</Badge>
+          </div>
+          <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
+            Límite por usuario: 35 búsquedas diarias • 1.8MB de espacio • Las búsquedas se pueden guardar para no perder el historial
+          </p>
         </div>
 
-        {/* Messages */}
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4 max-w-4xl mx-auto">
+        {/* Área de mensajes */}
+        <ScrollArea className="flex-1 p-6">
+          <div className="max-w-4xl mx-auto space-y-6">
+            {messages.length === 0 && (
+              <div className="text-center py-12">
+                <Bot className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-lg font-medium text-muted-foreground mb-2">
+                  ¡Hola! Soy tu asistente especializado
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Pregúntame sobre formulación, productos de limpieza, alimentos y laboratorio
+                </p>
+              </div>
+            )}
+            
             {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex gap-3 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <Card className={`max-w-[80%] ${message.type === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+              <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <Card className={`max-w-[80%] ${message.type === 'user' ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
                   <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0">
-                        {message.type === 'user' ? (
-                          <User className="h-6 w-6" />
-                        ) : (
-                          <Bot className="h-6 w-6" />
-                        )}
+                    {message.gptUsed && (
+                      <div className="flex items-center gap-2 mb-2 opacity-75">
+                        {message.type === 'user' ? <User className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
+                        <span className="text-xs">{message.gptUsed}</span>
                       </div>
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">
-                            {message.gptUsed || (message.type === 'user' ? 'Usuario' : 'Asistente')}
-                          </span>
-                          <span className="text-xs opacity-70">
-                            {message.timestamp.toLocaleTimeString()}
-                          </span>
-                        </div>
-                        
-                        {message.attachments && message.attachments.length > 0 && (
-                          <div className="mb-3 space-y-2">
-                            {message.attachments.map((att) => (
-                              <div key={att.id} className="flex items-center gap-2 p-2 bg-background/20 rounded">
-                                {att.type === 'image' && <Image className="h-4 w-4" />}
-                                {att.type === 'document' && <FileText className="h-4 w-4" />}
-                                {att.type === 'pdf' && <FileText className="h-4 w-4" />}
-                                <span className="text-sm">{att.name}</span>
-                              </div>
-                            ))}
+                    )}
+                    
+                    {message.attachments && message.attachments.length > 0 && (
+                      <div className="mb-3 space-y-2">
+                        {message.attachments.map((att) => (
+                          <div key={att.id} className="flex items-center gap-2 p-2 bg-background/20 rounded">
+                            {att.type === 'image' && <Image className="h-4 w-4" />}
+                            {att.type === 'document' && <FileText className="h-4 w-4" />}
+                            {att.type === 'pdf' && <FileText className="h-4 w-4" />}
+                            <span className="text-sm">{att.name}</span>
                           </div>
-                        )}
-                        
-                        <div className="text-sm leading-relaxed whitespace-pre-wrap">
-                          {message.content}
-                        </div>
+                        ))}
                       </div>
-                    </div>
+                    )}
+                    
+                    <p className="whitespace-pre-wrap">{message.content}</p>
                   </CardContent>
                 </Card>
               </div>
@@ -841,35 +877,186 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
           </div>
         </ScrollArea>
 
-        {/* Input Area */}
-        <div className="border-t border-border p-4 bg-card">
-          <div className="max-w-4xl mx-auto space-y-3">
-            {/* Selected GPT Info */}
-            {selectedGPT !== 'gpt4' && (
-              <div className="text-sm text-muted-foreground bg-muted p-3 rounded-lg">
-                <strong>GPT Activo:</strong> {allGPTs.find(gpt => gpt.id === selectedGPT)?.name}
-                {customGPTs.find(gpt => gpt.id === selectedGPT) && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      const gpt = customGPTs.find(g => g.id === selectedGPT);
-                      if (gpt) {
-                        setIsCreatingGPT(true);
-                        loadGPTFiles(gpt.id);
-                        setNewGPTName(gpt.name);
-                        setNewGPTDescription(gpt.description);
-                        setNewGPTInstructions(gpt.instructions);
-                      }
-                    }}
-                    className="ml-2"
-                  >
-                    <Upload className="h-3 w-3 mr-1" />
-                    Subir archivos
-                  </Button>
-                )}
+        {/* Área de entrada y botones */}
+        <div className="bg-card border-t border-border p-6">
+          <div className="max-w-4xl mx-auto space-y-4">
+            {/* Selector de GPT y Crear GPT */}
+            <div className="flex gap-4 items-center">
+              <div className="flex-1">
+                <Select value={selectedGPT} onValueChange={setSelectedGPT}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecciona un GPT" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {defaultGPTs.map((gpt) => (
+                      <SelectItem key={gpt.id} value={gpt.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{gpt.icon}</span>
+                          <div>
+                            <div className="font-medium">{gpt.name}</div>
+                            <div className="text-sm text-muted-foreground">{gpt.description}</div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                    {customGPTs.map((gpt) => (
+                      <SelectItem key={gpt.id} value={gpt.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{gpt.icon}</span>
+                          <div>
+                            <div className="font-medium">{gpt.name}</div>
+                            <div className="text-sm text-muted-foreground">{gpt.description}</div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
+              
+              <Dialog open={isCreatingGPT} onOpenChange={setIsCreatingGPT}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="rounded-[20px]">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crear GPT
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Crear GPT Personalizado</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Panel de configuración */}
+                    <div className="space-y-4">
+                      <h3 className="font-medium text-lg">Configuración</h3>
+                      <div>
+                        <label className="text-sm font-medium">Nombre *</label>
+                        <Input
+                          value={newGPTName}
+                          onChange={(e) => setNewGPTName(e.target.value)}
+                          placeholder="Ej: Experto en Cosméticos"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Descripción</label>
+                        <Input
+                          value={newGPTDescription}
+                          onChange={(e) => setNewGPTDescription(e.target.value)}
+                          placeholder="Breve descripción del GPT"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Instrucciones *</label>
+                        <Textarea
+                          value={newGPTInstructions}
+                          onChange={(e) => setNewGPTInstructions(e.target.value)}
+                          placeholder="Define el comportamiento y especialización del GPT..."
+                          rows={6}
+                        />
+                      </div>
+                      
+                      {/* Área de archivos */}
+                      <div>
+                        <label className="text-sm font-medium">Archivos de entrenamiento</label>
+                        <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center">
+                          <Paperclip className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">
+                            Arrastra archivos aquí o haz clic para subir
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Soporta: PDF, DOC, TXT, imágenes
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => {
+                          setNewGPTName('');
+                          setNewGPTDescription('');
+                          setNewGPTInstructions('');
+                          setTestInput('');
+                          setTestOutput('');
+                          setIsCreatingGPT(false);
+                        }} className="flex-1">
+                          Cancelar
+                        </Button>
+                        <Button onClick={createCustomGPT} className="flex-1">
+                          Crear GPT
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {/* Panel de pruebas */}
+                    <div className="space-y-4">
+                      <h3 className="font-medium text-lg">Probar funcionalidad</h3>
+                      <div>
+                        <label className="text-sm font-medium">Pregunta de prueba</label>
+                        <Textarea
+                          value={testInput}
+                          onChange={(e) => setTestInput(e.target.value)}
+                          placeholder="Escribe una pregunta para probar cómo respondería tu GPT..."
+                          rows={3}
+                        />
+                        <Button 
+                          size="sm" 
+                          className="mt-2 w-full"
+                          onClick={() => {
+                            if (testInput.trim() && newGPTInstructions.trim()) {
+                              setTestOutput(`GPT responde basado en: "${newGPTInstructions}"\n\nPregunta: ${testInput}\n\nRespuesta simulada: Esta sería la respuesta de tu GPT personalizado. En el entorno real, utilizaría las instrucciones proporcionadas para generar una respuesta especializada.`);
+                            } else {
+                              toast({
+                                title: "Error",
+                                description: "Agrega instrucciones y una pregunta de prueba",
+                                variant: "destructive"
+                              });
+                            }
+                          }}
+                        >
+                          Probar respuesta
+                        </Button>
+                      </div>
+                      
+                      <div>
+                        <label className="text-sm font-medium">Vista previa de respuesta</label>
+                        <Textarea
+                          value={testOutput}
+                          readOnly
+                          placeholder="Aquí aparecerá la respuesta de prueba de tu GPT..."
+                          rows={8}
+                          className="bg-muted/50"
+                        />
+                      </div>
+                      
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-sm text-blue-800">
+                          💡 <strong>Consejo:</strong> Refina las instrucciones hasta que las respuestas de prueba sean las que esperas.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {/* Controles Asistente Ingtec */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+              <div>
+                <label className="text-sm font-medium">Modo</label>
+                <Select value={mode} onValueChange={(v) => setMode(v as Mode)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Modo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AUTO">AUTO</SelectItem>
+                    <SelectItem value="CON ASISTENTE BÁSICO">Con asistente básico</SelectItem>
+                    <SelectItem value="CON ASISTENTE DETALLADO">Con asistente detallado</SelectItem>
+                    <SelectItem value="SIN ASISTENTE">Sin asistente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Archivos adjuntos */}
 
             {/* Archivos adjuntos */}
             {attachments.length > 0 && (
@@ -894,24 +1081,88 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
               </div>
             )}
 
+            {/* Botones de acción */}
+            <div className="flex flex-wrap gap-2 justify-center">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="rounded-[20px]"
+                onClick={copyConversation}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Copiar
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="rounded-[20px]"
+                onClick={() => downloadConversation('txt')}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Guardar como .txt
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="rounded-[20px]"
+                onClick={() => downloadConversation('docx')}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Guardar como .docx
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="rounded-[20px]"
+                onClick={() => downloadConversation('pdf')}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Guardar como .pdf
+              </Button>
+            </div>
+
+            <Separator />
+
+            {/* Botón Nueva búsqueda */}
+            <div className="flex justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNewSearch}
+                className="flex items-center gap-2 rounded-[20px]"
+              >
+                <Plus className="h-4 w-4" />
+                Nueva búsqueda
+              </Button>
+            </div>
+
+            <Separator />
+
+            {/* Campo de entrada con botón de archivos */}
             <div className="flex gap-2">
-              <div className="flex-1 flex gap-2">
-                <Input
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder="Escribe tu consulta aquí..."
-                  className="flex-1"
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                />
-                <Button
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-3"
-                >
-                  <Paperclip className="h-4 w-4" />
-                </Button>
-              </div>
-              <Button onClick={handleSendMessage} disabled={!inputValue.trim()}>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-12 w-12 rounded-[20px] shrink-0"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Plus className="h-5 w-5" />
+              </Button>
+              
+              <Input
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder="Haz tu pregunta aquí... Ej: ¿Qué enzima es mejor para desmanchar grasa en superficies hospitalarias?"
+                className="flex-1 h-12 rounded-[20px] bg-input"
+                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+              />
+              
+              <Button 
+                onClick={handleSendMessage}
+                className="h-12 px-8 rounded-[20px] bg-primary hover:bg-primary/90 shrink-0"
+                disabled={!inputValue.trim()}
+              >
                 Enviar
               </Button>
             </div>
