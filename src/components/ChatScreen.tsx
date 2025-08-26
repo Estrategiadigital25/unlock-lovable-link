@@ -14,6 +14,7 @@ import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { useToast } from "@/components/ui/use-toast";
 import { detectMode, type Mode } from "@/lib/promptOptimizer";
 import { askChat, type ChatMessage } from "@/lib/api";
+import TrainingFilesDropzone from "@/components/TrainingFilesDropzone";
 
 interface ChatScreenProps {
   onAdminPanel: () => void;
@@ -51,6 +52,15 @@ interface CustomGPT {
   instructions: string;
   icon: string;
   isDefault?: boolean;
+  trainingFiles?: UploadedFile[];
+}
+
+interface UploadedFile {
+  url: string;
+  name: string;
+  key: string;
+  type: string;
+  size: number;
 }
 
 const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
@@ -71,6 +81,7 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   const [newGPTInstructions, setNewGPTInstructions] = useState('');
   const [testInput, setTestInput] = useState('');
   const [testOutput, setTestOutput] = useState('');
+  const [trainingFiles, setTrainingFiles] = useState<UploadedFile[]>([]);
   
   const [mode, setMode] = useState<Mode>('AUTO');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -529,7 +540,8 @@ useEffect(() => {
       name: newGPTName,
       description: newGPTDescription || 'GPT personalizado',
       instructions: newGPTInstructions,
-      icon: '🤖'
+      icon: '🤖',
+      trainingFiles: trainingFiles.length > 0 ? [...trainingFiles] : undefined
     };
 
     const updatedGPTs = [...customGPTs, newGPT];
@@ -541,6 +553,7 @@ useEffect(() => {
     setNewGPTInstructions('');
     setTestInput('');
     setTestOutput('');
+    setTrainingFiles([]);
     setIsCreatingGPT(false);
 
     toast({
@@ -958,15 +971,17 @@ useEffect(() => {
                       {/* Área de archivos */}
                       <div>
                         <label className="text-sm font-medium">Archivos de entrenamiento</label>
-                        <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center">
-                          <Paperclip className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground">
-                            Arrastra archivos aquí o haz clic para subir
+                        <TrainingFilesDropzone
+                          presignEndpoint={import.meta.env.VITE_PRESIGN_ENDPOINT || ""}
+                          onChange={setTrainingFiles}
+                          maxFiles={10}
+                          maxSizeMB={25}
+                        />
+                        {!import.meta.env.VITE_PRESIGN_ENDPOINT && (
+                          <p className="text-xs text-amber-600 mt-2">
+                            ⚠️ VITE_PRESIGN_ENDPOINT no configurado. Los archivos no se subirán.
                           </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Soporta: PDF, DOC, TXT, imágenes
-                          </p>
-                        </div>
+                        )}
                       </div>
                       
                       <div className="flex gap-2">
@@ -976,6 +991,7 @@ useEffect(() => {
                           setNewGPTInstructions('');
                           setTestInput('');
                           setTestOutput('');
+                          setTrainingFiles([]);
                           setIsCreatingGPT(false);
                         }} className="flex-1">
                           Cancelar
