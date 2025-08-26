@@ -15,6 +15,12 @@ export const getEnvVars = () => ({
   brandAccent: import.meta.env.VITE_BRAND_ACCENT || '#a7bd74'
 });
 
+// Detect if presign endpoint is configured
+export const hasPresignEndpoint = (): boolean => {
+  const presign = import.meta.env.VITE_PRESIGN_ENDPOINT;
+  return !!presign && presign.trim() !== '';
+};
+
 // Mock data generators
 export const generateMockResponse = (message: string): string => {
   const responses = [

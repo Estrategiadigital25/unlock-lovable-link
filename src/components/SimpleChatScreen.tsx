@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Bot, User, Send, Trash2, Upload, Settings, FileText, Copy } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { getAppMode, generateMockResponse } from "@/lib/appMode";
+import { getAppMode, generateMockResponse, hasPresignEndpoint } from "@/lib/appMode";
 import { 
   getChatHistory, 
   saveChatHistory, 
@@ -38,6 +38,7 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
   const { toast } = useToast();
   const appMode = getAppMode();
   const userEmail = getUserEmail();
+  const hasPresign = hasPresignEndpoint();
 
   // Cargar historial al iniciar
   useEffect(() => {
@@ -117,7 +118,7 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
     });
   };
 
-  // Manejar upload de archivos (mock)
+  // Manejar upload de archivos con guardia de presign
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -127,12 +128,13 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
     try {
       const file = files[0];
       
-      if (appMode === 'mock') {
-        // Simular subida
-        await new Promise(resolve => setTimeout(resolve, 2000));
+      if (!hasPresign) {
+        // Fallback: simula subida y guarda referencia local
+        await new Promise(resolve => setTimeout(resolve, 1500));
         
+        const mockKey = `mock/${Date.now()}_${file.name}`;
         const mockUpload: MockUpload = {
-          key: `mock/${Date.now()}_${file.name}`,
+          key: mockKey,
           name: file.name,
           type: file.type,
           size: file.size,
@@ -143,15 +145,16 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
         setUploadStatus('done');
         
         toast({
-          title: "Archivo subido (mock)",
-          description: `${file.name} se ha simulado correctamente`,
+          title: "MODO DEMO: Subida simulada",
+          description: `${file.name} - Configura VITE_PRESIGN_ENDPOINT para S3 real`,
+          variant: "default"
         });
       } else {
-        // TODO: Implementar subida real
+        // TODO: Implementar subida real con presign
         setUploadStatus('error');
         toast({
           title: "Error",
-          description: "Subida real no implementada aún",
+          description: "Subida real con presign no implementada aún",
           variant: "destructive"
         });
       }
@@ -310,6 +313,11 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
               </p>
             </div>
             <div className="flex items-center space-x-2">
+              {!hasPresign && (
+                <div className="px-3 py-1 bg-amber-100 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 text-xs rounded-md">
+                  Modo Demo
+                </div>
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
