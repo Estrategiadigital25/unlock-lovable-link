@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Bot, User, Send, Trash2, Upload, Settings, FileText, Copy } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Bot, User, Send, Trash2, Upload, Settings, FileText, Copy, Plus } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { getAppMode, generateMockResponse, hasPresignEndpoint } from "@/lib/appMode";
 import { 
@@ -16,8 +17,11 @@ import {
   saveLegacyHistory,
   saveMockUpload,
   getUserEmail,
+  getCustomGPTs,
+  saveCustomGPT,
   type ChatMessage,
-  type MockUpload 
+  type MockUpload,
+  type CustomGPT
 } from "@/lib/localStorage";
 import TrainingFilesDropzone from "@/components/TrainingFilesDropzone";
 
@@ -32,6 +36,10 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
   const [trainingFiles, setTrainingFiles] = useState<any[]>([]);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [customGPTs, setCustomGPTs] = useState<CustomGPT[]>([]);
+  const [selectedGPT, setSelectedGPT] = useState<string | null>(null);
+  const [importGPTText, setImportGPTText] = useState('');
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -40,10 +48,12 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
   const userEmail = getUserEmail();
   const hasPresign = hasPresignEndpoint();
 
-  // Cargar historial al iniciar
+  // Cargar historial y GPTs al iniciar
   useEffect(() => {
     const history = getChatHistory();
     setMessages(history);
+    const gpts = getCustomGPTs();
+    setCustomGPTs(gpts);
   }, []);
 
   // Auto-scroll al final
@@ -71,9 +81,11 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
       let assistantResponse: string;
 
       if (appMode === 'mock') {
-        // Simular respuesta en modo mock
+        // Simular respuesta en modo mock con contexto de GPT si está seleccionado
         await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-        assistantResponse = generateMockResponse(message);
+        const currentGPT = selectedGPT ? customGPTs.find(g => g.id === selectedGPT) : null;
+        const gptContext = currentGPT ? `[Usando ${currentGPT.name}] ${currentGPT.instructions}` : '';
+        assistantResponse = generateMockResponse(message + (gptContext ? ` ${gptContext}` : ''));
       } else {
         // TODO: Llamar a API real en modo prod
         assistantResponse = "API real no implementada aún";
@@ -116,6 +128,43 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
       title: "Historial limpiado",
       description: "Se ha eliminado todo el historial de conversación.",
     });
+  };
+
+  // Importar GPT compartido
+  const handleImportGPT = () => {
+    try {
+      const gptData = JSON.parse(importGPTText);
+      
+      // Validar estructura básica
+      if (!gptData.name || !gptData.instructions) {
+        throw new Error('GPT inválido: debe tener al menos name e instructions');
+      }
+
+      const newGPT: CustomGPT = {
+        id: `gpt_${Date.now()}`,
+        name: gptData.name,
+        description: gptData.description || '',
+        instructions: gptData.instructions,
+        icon: gptData.icon || '🤖',
+        isDefault: false
+      };
+
+      saveCustomGPT(newGPT);
+      setCustomGPTs(prev => [...prev, newGPT]);
+      setImportGPTText('');
+      setIsImportDialogOpen(false);
+
+      toast({
+        title: "GPT importado",
+        description: `${newGPT.name} se ha añadido correctamente`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error al importar GPT",
+        description: "Verifica que el formato JSON sea correcto",
+        variant: "destructive"
+      });
+    }
   };
 
   // Manejar upload de archivos con guardia de presign
@@ -310,6 +359,9 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
               <h1 className="text-xl font-bold">Chat con Asistente IA</h1>
               <p className="text-sm text-muted-foreground">
                 Especializado en consultas técnicas de Ingtec
+                {selectedGPT && customGPTs.find(g => g.id === selectedGPT) && (
+                  <span className="ml-2">| GPT: {customGPTs.find(g => g.id === selectedGPT)?.name}</span>
+                )}
               </p>
             </div>
             <div className="flex items-center space-x-2">
@@ -318,6 +370,37 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
                   Modo Demo
                 </div>
               )}
+              
+              <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Importar GPT
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Importar GPT Compartido</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <Textarea
+                      placeholder="Pega aquí el JSON del GPT compartido..."
+                      value={importGPTText}
+                      onChange={(e) => setImportGPTText(e.target.value)}
+                      rows={6}
+                    />
+                    <div className="flex justify-end space-x-2">
+                      <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button onClick={handleImportGPT} disabled={!importGPTText.trim()}>
+                        Importar
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              
               <input
                 ref={fileInputRef}
                 type="file"
@@ -336,6 +419,31 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
               </Button>
             </div>
           </div>
+
+          {/* GPT Selector */}
+          {customGPTs.length > 0 && (
+            <div className="px-4 pb-4">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={selectedGPT === null ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedGPT(null)}
+                >
+                  🤖 Por defecto
+                </Button>
+                {customGPTs.map((gpt) => (
+                  <Button
+                    key={gpt.id}
+                    variant={selectedGPT === gpt.id ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedGPT(gpt.id)}
+                  >
+                    {gpt.icon} {gpt.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Mensajes */}

@@ -94,3 +94,49 @@ export const saveUserEmail = (email: string): void => {
 export const clearUserSession = (): void => {
   localStorage.removeItem('userEmail');
 };
+
+// Custom GPTs management
+export interface CustomGPT {
+  id: string;
+  name: string;
+  description: string;
+  instructions: string;
+  icon: string;
+  isDefault?: boolean;
+}
+
+export const getCustomGPTs = (): CustomGPT[] => {
+  try {
+    const data = localStorage.getItem('ingtec_custom_gpts');
+    return data ? JSON.parse(data) : [];
+  } catch (error) {
+    console.error('Error loading custom GPTs:', error);
+    return [];
+  }
+};
+
+export const saveCustomGPT = (gpt: CustomGPT): void => {
+  try {
+    const gpts = getCustomGPTs();
+    const existingIndex = gpts.findIndex(g => g.id === gpt.id);
+    
+    if (existingIndex >= 0) {
+      gpts[existingIndex] = gpt;
+    } else {
+      gpts.push(gpt);
+    }
+    
+    localStorage.setItem('ingtec_custom_gpts', JSON.stringify(gpts));
+  } catch (error) {
+    console.error('Error saving custom GPT:', error);
+  }
+};
+
+export const deleteCustomGPT = (id: string): void => {
+  try {
+    const gpts = getCustomGPTs().filter(g => g.id !== id);
+    localStorage.setItem('ingtec_custom_gpts', JSON.stringify(gpts));
+  } catch (error) {
+    console.error('Error deleting custom GPT:', error);
+  }
+};
