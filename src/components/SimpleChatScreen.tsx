@@ -446,43 +446,45 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
                 </div>
               )}
               
-              <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Importar JSON
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Importar GPT desde JSON</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <Textarea
-                      placeholder="Pega aquí el JSON del GPT compartido..."
-                      value={importGPTText}
-                      onChange={(e) => setImportGPTText(e.target.value)}
-                      rows={6}
-                    />
-                    <div className="flex justify-end space-x-2">
-                      <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>
-                        Cancelar
-                      </Button>
-                      <Button onClick={handleImportGPT} disabled={!importGPTText.trim()}>
-                        Importar
-                      </Button>
+              {/* Botones de importar GPT - más visibles */}
+              <div className="flex space-x-2 border border-primary/20 rounded-lg p-2 bg-primary/5">
+                <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="default" size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
+                      <Plus className="h-4 w-4 mr-2" />
+                      JSON
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Importar GPT desde JSON</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <Textarea
+                        placeholder="Pega aquí el JSON del GPT compartido..."
+                        value={importGPTText}
+                        onChange={(e) => setImportGPTText(e.target.value)}
+                        rows={6}
+                      />
+                      <div className="flex justify-end space-x-2">
+                        <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>
+                          Cancelar
+                        </Button>
+                        <Button onClick={handleImportGPT} disabled={!importGPTText.trim()}>
+                          Importar
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
+                  </DialogContent>
+                </Dialog>
 
-              <Dialog open={isURLImportOpen} onOpenChange={setIsURLImportOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Desde ChatGPT
-                  </Button>
-                </DialogTrigger>
+                <Dialog open={isURLImportOpen} onOpenChange={setIsURLImportOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="default" size="sm" className="bg-secondary text-secondary-foreground hover:bg-secondary/90">
+                      <Plus className="h-4 w-4 mr-2" />
+                      ChatGPT
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent className="max-w-lg">
                   <DialogHeader>
                     <DialogTitle>Importar desde ChatGPT</DialogTitle>
@@ -561,6 +563,7 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
                   </div>
                 </DialogContent>
               </Dialog>
+              </div>
               
               <input
                 ref={fileInputRef}
