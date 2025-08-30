@@ -40,6 +40,14 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
   const [selectedGPT, setSelectedGPT] = useState<string | null>(null);
   const [importGPTText, setImportGPTText] = useState('');
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [importFromURL, setImportFromURL] = useState('');
+  const [isURLImportOpen, setIsURLImportOpen] = useState(false);
+  const [urlGPTData, setUrlGPTData] = useState({
+    name: '',
+    description: '',
+    instructions: '',
+    icon: '🤖'
+  });
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -130,7 +138,7 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
     });
   };
 
-  // Importar GPT compartido
+  // Importar GPT compartido desde JSON
   const handleImportGPT = () => {
     try {
       const gptData = JSON.parse(importGPTText);
@@ -165,6 +173,73 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
         variant: "destructive"
       });
     }
+  };
+
+  // Procesar URL de ChatGPT
+  const handleURLProcess = () => {
+    try {
+      const url = importFromURL.trim();
+      if (!url.includes('chatgpt.com/g/')) {
+        throw new Error('URL no válida de ChatGPT');
+      }
+
+      // Extraer nombre del GPT de la URL
+      const urlParts = url.split('/');
+      const gptIdentifier = urlParts[urlParts.length - 1];
+      const gptNameFromURL = gptIdentifier.split('-').slice(1).join(' ').toUpperCase();
+
+      setUrlGPTData({
+        name: gptNameFromURL || 'GPT Importado',
+        description: `GPT importado desde: ${url}`,
+        instructions: '',
+        icon: '🔗'
+      });
+
+      toast({
+        title: "URL procesada",
+        description: "Completa la información del GPT manualmente",
+      });
+    } catch (error) {
+      toast({
+        title: "Error al procesar URL",
+        description: "Verifica que sea un enlace válido de ChatGPT",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Importar GPT desde URL (formulario manual)
+  const handleImportFromURL = () => {
+    if (!urlGPTData.name.trim() || !urlGPTData.instructions.trim()) {
+      toast({
+        title: "Campos requeridos",
+        description: "Nombre e instrucciones son obligatorios",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newGPT: CustomGPT = {
+      id: `gpt_${Date.now()}`,
+      name: urlGPTData.name,
+      description: urlGPTData.description,
+      instructions: urlGPTData.instructions,
+      icon: urlGPTData.icon,
+      isDefault: false
+    };
+
+    saveCustomGPT(newGPT);
+    setCustomGPTs(prev => [...prev, newGPT]);
+    
+    // Reset
+    setImportFromURL('');
+    setUrlGPTData({ name: '', description: '', instructions: '', icon: '🤖' });
+    setIsURLImportOpen(false);
+
+    toast({
+      title: "GPT importado",
+      description: `${newGPT.name} se ha añadido correctamente`,
+    });
   };
 
   // Manejar upload de archivos con guardia de presign
@@ -375,12 +450,12 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm">
                     <Plus className="h-4 w-4 mr-2" />
-                    Importar GPT
+                    Importar JSON
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-md">
                   <DialogHeader>
-                    <DialogTitle>Importar GPT Compartido</DialogTitle>
+                    <DialogTitle>Importar GPT desde JSON</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4">
                     <Textarea
@@ -395,6 +470,92 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
                       </Button>
                       <Button onClick={handleImportGPT} disabled={!importGPTText.trim()}>
                         Importar
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={isURLImportOpen} onOpenChange={setIsURLImportOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Desde ChatGPT
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Importar desde ChatGPT</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium">Enlace del GPT</label>
+                      <Input
+                        placeholder="https://chatgpt.com/g/g-xxxxx-nombre-gpt"
+                        value={importFromURL}
+                        onChange={(e) => setImportFromURL(e.target.value)}
+                      />
+                      <Button 
+                        onClick={handleURLProcess} 
+                        size="sm" 
+                        className="mt-2"
+                        disabled={!importFromURL.trim()}
+                      >
+                        Procesar URL
+                      </Button>
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium">Nombre</label>
+                        <Input
+                          placeholder="Nombre del GPT"
+                          value={urlGPTData.name}
+                          onChange={(e) => setUrlGPTData(prev => ({ ...prev, name: e.target.value }))}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="text-sm font-medium">Icono</label>
+                        <Input
+                          placeholder="🤖"
+                          value={urlGPTData.icon}
+                          onChange={(e) => setUrlGPTData(prev => ({ ...prev, icon: e.target.value }))}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="text-sm font-medium">Descripción</label>
+                        <Textarea
+                          placeholder="Descripción del GPT..."
+                          value={urlGPTData.description}
+                          onChange={(e) => setUrlGPTData(prev => ({ ...prev, description: e.target.value }))}
+                          rows={2}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="text-sm font-medium">Instrucciones *</label>
+                        <Textarea
+                          placeholder="Copia las instrucciones del GPT aquí..."
+                          value={urlGPTData.instructions}
+                          onChange={(e) => setUrlGPTData(prev => ({ ...prev, instructions: e.target.value }))}
+                          rows={4}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end space-x-2">
+                      <Button variant="outline" onClick={() => setIsURLImportOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button 
+                        onClick={handleImportFromURL} 
+                        disabled={!urlGPTData.name.trim() || !urlGPTData.instructions.trim()}
+                      >
+                        Crear GPT
                       </Button>
                     </div>
                   </div>
