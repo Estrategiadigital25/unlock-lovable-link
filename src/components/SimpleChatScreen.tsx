@@ -175,30 +175,53 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
     }
   };
 
-  // Procesar URL de ChatGPT
-  const handleURLProcess = () => {
+  // Procesar URL de ChatGPT con extracción automática mejorada
+  const handleURLProcess = async () => {
     try {
       const url = importFromURL.trim();
       if (!url.includes('chatgpt.com/g/')) {
         throw new Error('URL no válida de ChatGPT');
       }
 
-      // Extraer nombre del GPT de la URL
+      // Extraer información más detallada de la URL
       const urlParts = url.split('/');
-      const gptIdentifier = urlParts[urlParts.length - 1];
-      const gptNameFromURL = gptIdentifier.split('-').slice(1).join(' ').toUpperCase();
+      const gptSegment = urlParts.find(part => part.startsWith('g-'));
+      
+      if (!gptSegment) {
+        throw new Error('Formato de URL no reconocido');
+      }
 
-      setUrlGPTData({
-        name: gptNameFromURL || 'GPT Importado',
-        description: `GPT importado desde: ${url}`,
-        instructions: '',
-        icon: '🔗'
-      });
+      // Extraer el identificador y el nombre
+      const gptId = gptSegment;
+      const nameSegment = urlParts[urlParts.indexOf(gptSegment) + 1] || '';
+      
+      // Convertir el nombre de la URL a formato legible
+      const gptName = nameSegment
+        .split('-')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ') || 'GPT Importado';
 
-      toast({
-        title: "URL procesada",
-        description: "Completa la información del GPT manualmente",
-      });
+      // Generar instrucciones por defecto basadas en el nombre
+      const defaultInstructions = `Eres ${gptName}, un asistente especializado. Ayuda a los usuarios con consultas relacionadas a tu especialidad de manera clara y profesional.`;
+
+      const gptData = {
+        name: gptName,
+        description: `GPT compartido importado desde ChatGPT - ${gptName}`,
+        instructions: defaultInstructions,
+        icon: getRandomGPTIcon()
+      };
+
+      setUrlGPTData(gptData);
+
+      // Auto-importar si la información parece completa
+      if (gptName && gptName !== 'GPT Importado') {
+        await handleAutoImport(gptData);
+      } else {
+        toast({
+          title: "URL procesada",
+          description: "Revisa la información antes de guardar",
+        });
+      }
     } catch (error) {
       toast({
         title: "Error al procesar URL",
@@ -206,6 +229,41 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
         variant: "destructive"
       });
     }
+  };
+
+  // Importación automática mejorada
+  const handleAutoImport = async (gptData: any) => {
+    const newGPT: CustomGPT = {
+      id: crypto.randomUUID(),
+      name: gptData.name,
+      description: gptData.description,
+      instructions: gptData.instructions,
+      icon: gptData.icon || '🤖'
+    };
+
+    saveCustomGPT(newGPT);
+    setCustomGPTs(prev => [...prev, newGPT]);
+    
+    // Limpiar formulario
+    setUrlGPTData({
+      name: '',
+      description: '',
+      instructions: '',
+      icon: '🤖'
+    });
+    setImportFromURL('');
+    setIsURLImportOpen(false);
+    
+    toast({
+      title: "✅ GPT importado automáticamente",
+      description: `${newGPT.name} está listo para usar`,
+    });
+  };
+
+  // Obtener icono aleatorio para GPTs
+  const getRandomGPTIcon = () => {
+    const icons = ['🤖', '🎯', '💡', '🔥', '⚡', '🚀', '📚', '🎨', '🔬', '💻', '🎪', '🎭'];
+    return icons[Math.floor(Math.random() * icons.length)];
   };
 
   // Importar GPT desde URL (formulario manual)
@@ -247,28 +305,33 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
     });
   };
 
-  // Nueva función para pegar rápido desde portapapeles
+  // Función mejorada para detección automática desde portapapeles
   const handleQuickPaste = async () => {
     try {
       const clipboardText = await navigator.clipboard.readText();
       
-      // Si es una URL de ChatGPT
+      // Si es una URL de ChatGPT - PROCESAMIENTO AUTOMÁTICO
       if (clipboardText.includes('chatgpt.com/g/')) {
         setImportFromURL(clipboardText);
-        setIsURLImportOpen(true);
-        setTimeout(() => handleURLProcess(), 100);
+        
+        toast({
+          title: "🔗 Enlace de ChatGPT detectado",
+          description: "Procesando automáticamente...",
+        });
+        
+        // Procesar automáticamente sin abrir diálogo
+        await handleDirectGPTImport(clipboardText);
         return;
       }
       
       // Si parece ser JSON
       if (clipboardText.trim().startsWith('{') && clipboardText.trim().endsWith('}')) {
         try {
-          JSON.parse(clipboardText);
-          setImportGPTText(clipboardText);
-          setIsURLImportOpen(true);
+          const gptData = JSON.parse(clipboardText);
+          await handleDirectJSONImport(gptData);
         } catch (e) {
           toast({
-            title: "Formato incorrecto",
+            title: "JSON inválido",
             description: "El texto copiado no es un JSON válido",
             variant: "destructive"
           });
@@ -289,14 +352,114 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
       
       toast({
         title: "Contenido no reconocido",
-        description: "No se pudo identificar el formato del contenido copiado",
+        description: "Copia un enlace de ChatGPT o código JSON",
         variant: "destructive"
       });
       
     } catch (error) {
       toast({
-        title: "Error",
-        description: "No se pudo acceder al portapapeles",
+        title: "Error de portapapeles",
+        description: "No se pudo leer el contenido copiado",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Importación directa de GPT desde URL (sin diálogo)
+  const handleDirectGPTImport = async (url: string) => {
+    try {
+      if (!url.includes('chatgpt.com/g/')) {
+        throw new Error('URL no válida');
+      }
+
+      const urlParts = url.split('/');
+      const gptSegment = urlParts.find(part => part.startsWith('g-'));
+      
+      if (!gptSegment) {
+        throw new Error('Formato de URL no reconocido');
+      }
+
+      const nameSegment = urlParts[urlParts.indexOf(gptSegment) + 1] || '';
+      
+      const gptName = nameSegment
+        .split('-')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ') || `GPT-${Date.now()}`;
+
+      const newGPT: CustomGPT = {
+        id: crypto.randomUUID(),
+        name: gptName,
+        description: `GPT compartido: ${gptName}`,
+        instructions: `Eres ${gptName}, un asistente especializado. Ayuda a los usuarios de manera profesional y detallada según tu especialidad.`,
+        icon: getRandomGPTIcon()
+      };
+
+      // Verificar si ya existe
+      const existingGPT = customGPTs.find(gpt => gpt.name === newGPT.name);
+      if (existingGPT) {
+        toast({
+          title: "⚠️ GPT ya existe",
+          description: `Ya tienes "${newGPT.name}" en tu repositorio`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      saveCustomGPT(newGPT);
+      setCustomGPTs(prev => [...prev, newGPT]);
+      
+      toast({
+        title: "🎉 GPT agregado exitosamente",
+        description: `${newGPT.name} está listo para usar`,
+      });
+      
+    } catch (error) {
+      toast({
+        title: "Error al importar",
+        description: "No se pudo procesar el enlace de ChatGPT",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Importación directa desde JSON
+  const handleDirectJSONImport = async (gptData: any) => {
+    try {
+      if (!gptData.name || !gptData.instructions) {
+        throw new Error('JSON incompleto');
+      }
+
+      const newGPT: CustomGPT = {
+        id: crypto.randomUUID(),
+        name: gptData.name,
+        description: gptData.description || `GPT importado: ${gptData.name}`,
+        instructions: gptData.instructions,
+        icon: gptData.icon || getRandomGPTIcon()
+      };
+
+      // Verificar duplicados
+      const existingGPT = customGPTs.find(gpt => gpt.name === newGPT.name);
+      if (existingGPT) {
+        toast({
+          title: "⚠️ GPT duplicado",
+          description: `Ya tienes "${newGPT.name}" en tu repositorio`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      saveCustomGPT(newGPT);
+      setCustomGPTs(prev => [...prev, newGPT]);
+      
+      toast({
+        title: "📥 GPT importado desde JSON",
+        description: `${newGPT.name} está disponible`,
+      });
+      
+    } catch (error) {
+      toast({
+        title: "Error en JSON",
+        description: "Formato de GPT inválido",
         variant: "destructive"
       });
     }
@@ -508,11 +671,21 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
               
               {/* Función principal de importar GPT */}
               <div className="flex flex-col space-y-2">
+                {/* Botón principal de importación automática */}
+                <Button 
+                  variant="default" 
+                  size="sm" 
+                  onClick={handleQuickPaste}
+                  className="bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 font-medium shadow-lg"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  🚀 Importar GPT Automático
+                </Button>
+                
                 <Dialog open={isURLImportOpen} onOpenChange={setIsURLImportOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="default" size="sm" className="bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 font-medium">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Importar GPT Compartido
+                    <Button variant="outline" size="sm" className="text-xs">
+                      ⚙️ Importar Manual
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-lg">
@@ -621,15 +794,10 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
                   </DialogContent>
                 </Dialog>
                 
-                {/* Botón de acceso rápido para portapapeles */}
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleQuickPaste}
-                  className="text-xs opacity-75 hover:opacity-100"
-                >
-                  📋 Pegar desde portapapeles
-                </Button>
+                {/* Instrucciones rápidas */}
+                <div className="text-xs text-muted-foreground text-center">
+                  💡 <strong>Tip:</strong> Copia cualquier enlace de ChatGPT y haz click en "Importar Automático"
+                </div>
               </div>
 
               
