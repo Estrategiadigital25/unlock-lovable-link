@@ -2,7 +2,7 @@
 // src/App.tsx
 import { useState } from "react";
 import LoginScreen from "@/components/LoginScreen";
-import ChatScreen from "@/components/ChatScreen";
+import SimpleChatScreen from "@/components/SimpleChatScreen";
 import AdminPanel from "@/components/AdminPanel";
 
 type Screen = 'login' | 'chat' | 'admin';
@@ -17,5 +17,5 @@ export default function App() {
   if (currentScreen === 'login') return <LoginScreen onLogin={handleLogin} />;
   if (currentScreen === 'admin') return <AdminPanel onBack={handleBackToChat} />;
 
-  return <ChatScreen onAdminPanel={handleAdminPanel} />;
+  return <SimpleChatScreen onAdminPanel={handleAdminPanel} />;
 }
