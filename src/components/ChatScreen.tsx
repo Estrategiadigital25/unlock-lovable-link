@@ -15,6 +15,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { detectMode, type Mode } from "@/lib/promptOptimizer";
 import { askChat, type ChatMessage } from "@/lib/api";
 import TrainingFilesDropzone from "@/components/TrainingFilesDropzone";
+import GPTImportExport from "@/components/GPTImportExport";
 
 interface ChatScreenProps {
   onAdminPanel: () => void;
@@ -934,6 +935,12 @@ useEffect(() => {
                     Crear GPT
                   </Button>
                 </DialogTrigger>
+                
+              {/* Import/Export GPTs */}
+              <GPTImportExport 
+                customGPTs={customGPTs} 
+                onGPTsUpdated={setCustomGPTs} 
+              />
                 <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Crear GPT Personalizado</DialogTitle>
