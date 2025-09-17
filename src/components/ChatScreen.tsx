@@ -14,6 +14,7 @@ import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { useToast } from "@/components/ui/use-toast";
 import { detectMode, type Mode } from "@/lib/promptOptimizer";
 import { askChat, type ChatMessage } from "@/lib/api";
+import { getUserEmail } from "@/lib/localStorage";
 import TrainingFilesDropzone from "@/components/TrainingFilesDropzone";
 import GPTImportExport from "@/components/GPTImportExport";
 
@@ -77,6 +78,8 @@ const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
   const [customGPTs, setCustomGPTs] = useState<CustomGPT[]>([]);
   const [isCreatingGPT, setIsCreatingGPT] = useState(false);
   const [isNewChatOpen, setIsNewChatOpen] = useState(false);
+  
+  const userEmail = getUserEmail();
   const [newGPTName, setNewGPTName] = useState('');
   const [newGPTDescription, setNewGPTDescription] = useState('');
   const [newGPTInstructions, setNewGPTInstructions] = useState('');
@@ -983,6 +986,8 @@ useEffect(() => {
                           onChange={setTrainingFiles}
                           maxFiles={10}
                           maxSizeMB={25}
+                          userEmail={userEmail || undefined}
+                          gptId={newGPTName ? `new-${newGPTName.toLowerCase().replace(/\s+/g, '-')}` : undefined}
                         />
                         {!import.meta.env.VITE_PRESIGN_ENDPOINT && (
                           <p className="text-xs text-amber-600 mt-2">

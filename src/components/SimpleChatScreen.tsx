@@ -37,6 +37,7 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
   const [trainingFiles, setTrainingFiles] = useState<any[]>([]);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isCreateGPTOpen, setIsCreateGPTOpen] = useState(false);
   const [customGPTs, setCustomGPTs] = useState<CustomGPT[]>([]);
   const [selectedGPT, setSelectedGPT] = useState<string | null>(null);
   const [importGPTText, setImportGPTText] = useState('');
@@ -44,6 +45,14 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
   const [importFromURL, setImportFromURL] = useState('');
   const [isURLImportOpen, setIsURLImportOpen] = useState(false);
   const [urlGPTData, setUrlGPTData] = useState({
+    name: '',
+    description: '',
+    instructions: '',
+    icon: '🤖'
+  });
+  
+  // New GPT creation form state
+  const [newGPTData, setNewGPTData] = useState({
     name: '',
     description: '',
     instructions: '',
@@ -136,6 +145,55 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
     toast({
       title: "Historial limpiado",
       description: "Se ha eliminado todo el historial de conversación.",
+    });
+  };
+
+  // Handle creating a new GPT
+  const handleCreateGPT = () => {
+    if (!newGPTData.name.trim()) {
+      toast({
+        title: "Error",
+        description: "El nombre del GPT es obligatorio",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check if GPT with same name already exists
+    const existingGPT = customGPTs.find(gpt => gpt.name.toLowerCase() === newGPTData.name.toLowerCase());
+    if (existingGPT) {
+      toast({
+        title: "⚠️ GPT ya existe",
+        description: `Ya tienes un GPT llamado "${newGPTData.name}"`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newGPT: CustomGPT = {
+      id: crypto.randomUUID(),
+      name: newGPTData.name.trim(),
+      description: newGPTData.description.trim() || `GPT personalizado: ${newGPTData.name}`,
+      instructions: newGPTData.instructions.trim() || `Eres ${newGPTData.name}, un asistente especializado. Ayuda a los usuarios de manera profesional.`,
+      icon: newGPTData.icon
+    };
+
+    saveCustomGPT(newGPT);
+    setCustomGPTs(prev => [...prev, newGPT]);
+    
+    // Reset form and close dialog
+    setNewGPTData({
+      name: '',
+      description: '',
+      instructions: '',
+      icon: '🤖'
+    });
+    setTrainingFiles([]);
+    setIsCreateGPTOpen(false);
+    
+    toast({
+      title: "🎉 GPT creado exitosamente",
+      description: `${newGPT.name} está listo para usar`,
     });
   };
 
@@ -620,18 +678,70 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
                       </div>
                     </div>
                   </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Create GPT Dialog */}
+            <Dialog open={isCreateGPTOpen} onOpenChange={setIsCreateGPTOpen}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Crear Nuevo GPT</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Nombre</label>
+                    <Input
+                      value={newGPTData.name}
+                      onChange={(e) => setNewGPTData({...newGPTData, name: e.target.value})}
+                      placeholder="Ej: Experto en Química"
+                    />
+                  </div>
                   
-                  {appMode === 'mock' && (
-                    <div>
-                      <h3 className="font-medium mb-2">Entrenamiento (Mock)</h3>
-                      <TrainingFilesDropzone
-                        presignEndpoint=""
-                        onChange={setTrainingFiles}
-                        maxFiles={5}
-                        maxSizeMB={10}
-                      />
-                    </div>
-                  )}
+                  <div>
+                    <label className="text-sm font-medium">Descripción</label>
+                    <Input
+                      value={newGPTData.description}
+                      onChange={(e) => setNewGPTData({...newGPTData, description: e.target.value})}
+                      placeholder="Breve descripción del GPT"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium">Instrucciones</label>
+                    <Textarea
+                      value={newGPTData.instructions}
+                      onChange={(e) => setNewGPTData({...newGPTData, instructions: e.target.value})}
+                      placeholder="Define cómo debe comportarse el GPT..."
+                      rows={4}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium">Archivos de entrenamiento</label>
+                    <TrainingFilesDropzone
+                      presignEndpoint={import.meta.env.VITE_PRESIGN_ENDPOINT || ""}
+                      onChange={setTrainingFiles}
+                      maxFiles={5}
+                      maxSizeMB={10}
+                      userEmail={userEmail || undefined}
+                      gptId={newGPTData.name ? `new-${newGPTData.name.toLowerCase().replace(/\s+/g, '-')}` : "new-gpt"}
+                    />
+                    {!import.meta.env.VITE_PRESIGN_ENDPOINT && (
+                      <p className="text-xs text-amber-600 mt-2">
+                        ⚠️ VITE_PRESIGN_ENDPOINT no configurado. Los archivos no se subirán.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <Button variant="outline" onClick={() => setIsCreateGPTOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={handleCreateGPT}>
+                      Crear GPT
+                    </Button>
+                  </div>
                 </div>
               </DialogContent>
             </Dialog>
@@ -668,6 +778,7 @@ const SimpleChatScreen = ({ onAdminPanel }: SimpleChatScreenProps) => {
                 variant="default" 
                 size="sm"
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
+                onClick={() => setIsCreateGPTOpen(true)}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Crear GPT

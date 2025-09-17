@@ -17,13 +17,17 @@ interface TrainingFilesDropzoneProps {
   onChange: (files: UploadedFile[]) => void;
   maxFiles?: number;
   maxSizeMB?: number;
+  userEmail?: string;
+  gptId?: string;
 }
 
 const TrainingFilesDropzone = ({ 
   presignEndpoint, 
   onChange, 
   maxFiles = 10, 
-  maxSizeMB = 25 
+  maxSizeMB = 25,
+  userEmail,
+  gptId
 }: TrainingFilesDropzoneProps) => {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [uploading, setUploading] = useState<string[]>([]);
@@ -66,42 +70,76 @@ const TrainingFilesDropzone = ({
       setUploading(prev => [...prev, fileId]);
       setProgress(prev => ({ ...prev, [fileId]: 0 }));
 
-      // 1. Obtener URL presignada
+      // Handle mock mode (no presign endpoint)
+      if (!presignEndpoint || presignEndpoint.trim() === '') {
+        console.log('Mock mode upload for file:', file.name);
+        
+        // Simulate upload delay
+        await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+        
+        setProgress(prev => ({ ...prev, [fileId]: 50 }));
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setProgress(prev => ({ ...prev, [fileId]: 100 }));
+
+        // Create mock file reference
+        const mockFileUrl = `mock://${fileId}/${file.name}`;
+        const mockKey = `mock/${fileId}/${file.name}`;
+
+        console.log('Mock upload completed for:', file.name);
+
+        return {
+          url: mockFileUrl,
+          name: file.name,
+          key: mockKey,
+          type: file.type,
+          size: file.size
+        };
+      }
+
+      // Real S3 upload flow
+      setProgress(prev => ({ ...prev, [fileId]: 10 }));
+
+      // 1. Get presigned URL from Lambda function
       const presignResponse = await fetch(presignEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          filename: file.name,
-          contentType: file.type,
-          sizeBytes: file.size
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          userEmail: userEmail,
+          gptId: gptId
         })
       });
 
       if (!presignResponse.ok) {
-        const error = await presignResponse.text();
-        throw new Error(`Error obteniendo URL: ${error}`);
+        const errorData = await presignResponse.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `HTTP ${presignResponse.status}`);
       }
 
-      const { uploadUrl, fileUrl, key } = await presignResponse.json();
+      const { uploadUrl, accessUrl, fileKey } = await presignResponse.json();
       setProgress(prev => ({ ...prev, [fileId]: 30 }));
 
-      // 2. Subir archivo a S3
+      // 2. Upload file to S3 using presigned URL
       const uploadResponse = await fetch(uploadUrl, {
         method: 'PUT',
-        headers: { 'Content-Type': file.type },
+        headers: { 
+          'Content-Type': file.type,
+          'Content-Length': file.size.toString()
+        },
         body: file
       });
 
       if (!uploadResponse.ok) {
-        throw new Error(`Error subiendo archivo: ${uploadResponse.status}`);
+        throw new Error(`Upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
       }
 
       setProgress(prev => ({ ...prev, [fileId]: 100 }));
 
       return {
-        url: fileUrl,
+        url: accessUrl,
         name: file.name,
-        key,
+        key: fileKey,
         type: file.type,
         size: file.size
       };
@@ -125,6 +163,8 @@ const TrainingFilesDropzone = ({
 
   const handleFiles = async (files: FileList) => {
     const fileArray = Array.from(files);
+    console.log('handleFiles called with:', fileArray.length, 'files');
+    console.log('presignEndpoint:', presignEndpoint);
     
     // Validaciones
     if (uploadedFiles.length + fileArray.length > maxFiles) {
@@ -140,6 +180,9 @@ const TrainingFilesDropzone = ({
     const invalidFiles = fileArray.filter(file => 
       !supportedTypes.includes(file.type) || file.size > maxBytes
     );
+
+    console.log('Invalid files:', invalidFiles);
+    console.log('File types:', fileArray.map(f => f.type));
 
     if (invalidFiles.length > 0) {
       toast({
@@ -160,13 +203,22 @@ const TrainingFilesDropzone = ({
     const results = await Promise.all(uploadPromises);
     const successfulUploads = results.filter((result): result is UploadedFile => result !== null);
 
+    console.log('Upload results:', results);
+    console.log('Successful uploads:', successfulUploads);
+
     if (successfulUploads.length > 0) {
       const newFiles = [...uploadedFiles, ...successfulUploads];
       setUploadedFiles(newFiles);
       onChange(newFiles);
+      
+      const isMockMode = !presignEndpoint || presignEndpoint.trim() === '';
+      console.log('isMockMode:', isMockMode, 'presignEndpoint:', presignEndpoint);
+      
       toast({
-        title: "Archivos subidos",
-        description: `${successfulUploads.length} archivo(s) subido(s) exitosamente`
+        title: isMockMode ? "Archivos simulados" : "Archivos subidos",
+        description: isMockMode 
+          ? `${successfulUploads.length} archivo(s) simulado(s) - Configura VITE_PRESIGN_ENDPOINT para subida real`
+          : `${successfulUploads.length} archivo(s) subido(s) exitosamente a S3`
       });
     }
   };

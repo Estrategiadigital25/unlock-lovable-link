@@ -1,0 +1,24 @@
+{
+  "name": "ingtec-presigned-url-generator",
+  "version": "1.0.0",
+  "description": "AWS Lambda function to generate presigned URLs for S3 file uploads",
+  "main": "presigned-url-generator.js",
+  "dependencies": {
+    "aws-sdk": "^2.1490.0"
+  },
+  "devDependencies": {
+    "aws-lambda-mock-context": "^3.2.1"
+  },
+  "scripts": {
+    "test": "node test.js",
+    "package": "zip -r function.zip presigned-url-generator.js package.json node_modules/"
+  },
+  "keywords": [
+    "aws",
+    "lambda", 
+    "s3",
+    "presigned-url"
+  ],
+  "author": "Ingtec AI Team",
+  "license": "MIT"
+}
