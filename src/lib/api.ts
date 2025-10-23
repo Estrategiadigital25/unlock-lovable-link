@@ -1,5 +1,7 @@
 // src/lib/api.ts
-const BASE = "https://lozhxacampqoxmjbnekf.supabase.co/functions/v1/chat";
+const BASE = import.meta.env.VITE_SUPABASE_URL 
+  ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`
+  : "https://pfvjblcoyjvcevojkomf.supabase.co/functions/v1/chat";
 
 export interface ChatMessage {
   role: string;
