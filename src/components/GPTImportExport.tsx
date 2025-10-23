@@ -17,7 +17,7 @@ import {
   validateGPTImportData, 
   validateGPTsCollectionData,
   importCustomGPT,
-  import CustomGPTs,
+  importCustomGPTs,
   downloadFile,
   getCustomGPTs
 } from '@/lib/localStorage';
