@@ -3,93 +3,148 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import { getAppMode, isValidIngrecEmail } from "@/lib/appMode";
-import { saveUserEmail } from "@/lib/localStorage";
+import { supabase } from "@/integrations/supabase/client";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 interface LoginScreenProps {
   onLogin: () => void;
 }
 
+// Lista de emails autorizados - solo estos pueden registrarse
+export const AUTHORIZED_EMAILS = [
+  'liderdesarrollo@iespecialidades.com',
+  'estrategiadigital@iespecialidades.com',
+  'lideralimentos@iespecialidades.com',
+  'contabilidad2@iespecialidades.com',
+  'cesar.ospina@iespecialidades.com',
+  'contabilidad@iespecialidades.com',
+  'juan.espejo@iespecialidades.com',
+  'servicioalcliente@iespecialidades.com',
+  'factura@iespecialidades.com',
+  'janeth.gomez@iespecialidades.com',
+  'jimena.porras@iespecialidades.com',
+  'compras@iespecialidades.com',
+  'lidercontable@iespecialidades.com',
+  'procesos@iespecialidades.com',
+  'gear@iespecialidades.com',
+  'laboratorio3@iespecialidades.com',
+  'laboratorio9@iespecialidades.com',
+  'laboratorio6@iespecialidades.com',
+  'martin.correa@iespecialidades.com',
+  'operaciones@iespecialidades.com',
+  'laboratorio5@iespecialidades.com',
+  'powerbi@iespecialidades.com',
+  'powerbi2@iespecialidades.com',
+  'practicante@iespecialidades.com',
+  'laboratorio8@iespecialidades.com',
+  'auxiliaradministrativa@iespecialidades.com',
+  'wilmer.pinzon@iespecialidades.com',
+  'liderformuladores@iespecialidades.com',
+  'lorena.hurtado@iespecialidades.com',
+  'prueba@iespecialidades.com'
+  'angie.loaiza@iespecialidades.com'
+
+];
+
 const LoginScreen = ({ onLogin }: LoginScreenProps) => {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const appMode = getAppMode();
 
-  // Lista de emails autorizados (solo para mock mode - en prod usaría Cognito)
-  const authorizedEmails = [
-    'liderdesarrollo@iespecialidades.com',
-    'estrategiadigital@iespecialidades.com',
-    'lideralimentos@iespecialidades.com',
-    'contabilidad2@iespecialidades.com',
-    'cesar.ospina@iespecialidades.com',
-    'contabilidad@iespecialidades.com',
-    'juan.espejo@iespecialidades.com',
-    'servicioalcliente@iespecialidades.com',
-    'factura@iespecialidades.com',
-    'janeth.gomez@iespecialidades.com',
-    'jimena.porras@iespecialidades.com',
-    'compras@iespecialidades.com',
-    'lidercontable@iespecialidades.com',
-    'procesos@iespecialidades.com',
-    'gear@iespecialidades.com',
-    'laboratorio3@iespecialidades.com',
-    'laboratorio9@iespecialidades.com',
-    'laboratorio6@iespecialidades.com',
-    'martin.correa@iespecialidades.com',
-    'operaciones@iespecialidades.com',
-    'laboratorio5@iespecialidades.com',
-    'powerbi@iespecialidades.com',
-    'powerbi2@iespecialidades.com',
-    'practicante@iespecialidades.com',
-    'laboratorio8@iespecialidades.com',
-    'auxiliaradministrativa@iespecialidades.com',
-    'wilmer.pinzon@iespecialidades.com',
-    'liderformuladores@iespecialidades.com',
-    'lorena.hurtado@iespecialidades.com',
-    'prueba@iespecialidades.com'
-  ];
-
-  const handleLogin = () => {
+  const handleAuth = async () => {
     const trimmedEmail = email.trim().toLowerCase();
     
-    if (!trimmedEmail) {
+    if (!trimmedEmail || !password) {
       toast({
-        title: "Error",
-        description: "Por favor ingresa tu email corporativo.",
+        title: "Campos incompletos",
+        description: "Por favor ingresa tu email y contraseña.",
         variant: "destructive"
       });
       return;
     }
 
-    // Validación del dominio corporativo
-    if (!isValidIngrecEmail(trimmedEmail)) {
-      toast({
-        title: "Acceso denegado",
-        description: "Usa un correo @iespecialidades.com válido.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // En modo mock, validar contra lista de emails autorizados
-    if (appMode === 'mock' && !authorizedEmails.includes(trimmedEmail)) {
+    // Validar que sea email de iespecialidades.com
+    if (!trimmedEmail.endsWith('@iespecialidades.com')) {
       toast({
         title: "Acceso denegado",
-        description: "Tu email no está autorizado. Solo cuentas @iespecialidades.com registradas pueden acceder.",
+        description: "Solo correos @iespecialidades.com están permitidos.",
         variant: "destructive"
       });
       return;
     }
 
-    // Guardar email y proceder
-    saveUserEmail(trimmedEmail);
-    
-    toast({
-      title: `Acceso autorizado ${appMode === 'mock' ? '(modo mock)' : ''}`,
-      description: `Bienvenido al Buscador GPT de Ingtec.`,
-    });
-    
-    onLogin();
+    // Validar que esté en la lista de autorizados
+    if (!AUTHORIZED_EMAILS.includes(trimmedEmail)) {
+      toast({
+        title: "Acceso denegado",
+        description: "Tu email no está autorizado para usar esta aplicación.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      if (isRegistering) {
+        // REGISTRO: Crear nueva cuenta
+        const { data, error } = await supabase.auth.signUp({
+          email: trimmedEmail,
+          password: password,
+          options: {
+            data: {
+              full_name: trimmedEmail.split('@')[0],
+            },
+          },
+        });
+
+        if (error) throw error;
+
+        if (data.user) {
+          toast({
+            title: "Cuenta creada exitosamente",
+            description: "Por favor verifica tu email para activar tu cuenta. Revisa también tu carpeta de spam.",
+          });
+          setIsRegistering(false);
+          setPassword('');
+        }
+      } else {
+        // LOGIN: Iniciar sesión
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: trimmedEmail,
+          password: password,
+        });
+
+        if (error) {
+          if (error.message.includes('Invalid login credentials')) {
+            throw new Error('Email o contraseña incorrectos');
+          }
+          if (error.message.includes('Email not confirmed')) {
+            throw new Error('Por favor verifica tu email antes de iniciar sesión');
+          }
+          throw error;
+        }
+
+        if (data.user) {
+          toast({
+            title: "¡Bienvenido!",
+            description: `Acceso autorizado para ${trimmedEmail}`,
+          });
+          onLogin();
+        }
+      }
+    } catch (error: any) {
+      toast({
+        title: isRegistering ? "Error al crear cuenta" : "Error al iniciar sesión",
+        description: error.message || "Intenta de nuevo o contacta al administrador.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -133,9 +188,9 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
             <div className="border rounded-lg p-4" style={{ backgroundColor: '#a7db74' + '10', borderColor: '#a7db74' + '40' }}>
               <CardDescription className="text-center leading-relaxed text-sm" style={{ color: '#a7db74' }}>
                 <span className="inline-block mr-2">🔐</span>
-                <strong>Acceso exclusivo para colaboradores</strong><br/>
+                <strong>Acceso seguro con autenticación</strong><br/>
                 Solo cuentas @iespecialidades.com autorizadas.<br/>
-                Tu actividad es registrada para seguridad y trazabilidad.
+                {isRegistering ? 'Crea tu cuenta por primera vez.' : 'Inicia sesión con tu contraseña.'}
               </CardDescription>
             </div>
             
@@ -146,16 +201,61 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="h-12 text-center"
-                onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                disabled={loading}
               />
               
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  placeholder={isRegistering ? "Crea una contraseña (mín. 6 caracteres)" : "Tu contraseña"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="h-12 text-center pr-10"
+                  onKeyPress={(e) => e.key === 'Enter' && handleAuth()}
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  disabled={loading}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              
               <Button 
-                onClick={handleLogin}
+                onClick={handleAuth}
+                disabled={loading}
                 className="w-full h-14 rounded-[20px] bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
               >
-                <span className="mr-2">✓</span>
-                Validar identidad y acceder
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    {isRegistering ? 'Creando cuenta...' : 'Validando...'}
+                  </>
+                ) : (
+                  <>
+                    <span className="mr-2">✓</span>
+                    {isRegistering ? 'Crear cuenta' : 'Validar identidad y acceder'}
+                  </>
+                )}
               </Button>
+
+              <button
+                onClick={() => {
+                  setIsRegistering(!isRegistering);
+                  setPassword('');
+                }}
+                className="w-full text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                disabled={loading}
+              >
+                {isRegistering ? (
+                  <>¿Ya tienes cuenta? <span className="font-semibold" style={{ color: '#a7db74' }}>Inicia sesión aquí</span></>
+                ) : (
+                  <>¿Primera vez? <span className="font-semibold" style={{ color: '#a7db74' }}>Crea tu cuenta aquí</span></>
+                )}
+              </button>
             </div>
             
             <div className="text-center">
@@ -171,3 +271,5 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
 };
 
 export default LoginScreen;
+
+
