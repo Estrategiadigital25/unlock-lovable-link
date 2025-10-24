@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Download, Copy, Edit, Settings, Plus, Paperclip, Image, FileText, Trash2, Bot, User } from "lucide-react";
+import { Download, Copy, Edit, Settings, Plus, Paperclip, Image, FileText, Trash2, Bot, User, LogOut } from "lucide-react";
 import jsPDF from 'jspdf';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { useToast } from "@/components/ui/use-toast";
@@ -20,6 +20,7 @@ import GPTImportExport from "@/components/GPTImportExport";
 
 interface ChatScreenProps {
   onAdminPanel: () => void;
+  onLogout: () => void;
 }
 
 interface Message {
@@ -65,7 +66,7 @@ interface UploadedFile {
   size: number;
 }
 
-const ChatScreen = ({ onAdminPanel }: ChatScreenProps) => {
+const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -629,19 +630,29 @@ useEffect(() => {
 };
 
   return (
-    <div className="min-h-screen bg-background font-montserrat flex">
-      {/* Sidebar con historial */}
-      <div className="w-80 bg-card border-r border-border p-4 flex flex-col">
+          <div className="w-80 bg-card border-r border-border p-4 flex flex-col">
         <div className="flex items-center justify-between mb-6">
           <h3 className="font-semibold text-foreground">Historial</h3>
-          <Button
-            onClick={onAdminPanel}
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0"
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={onAdminPanel}
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              title="Panel de administración"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={onLogout}
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+              title="Cerrar sesión"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <ScrollArea className="h-[calc(50vh-120px)] flex-shrink-0">
           <div className="space-y-2">
