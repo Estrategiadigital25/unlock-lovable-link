@@ -626,13 +626,17 @@ useEffect(() => {
       gptUsed: "Error"
     };
     setMessages((prev) => [...prev, errorMessage]);
-  }
+</div>
+  );
 };
 
-  return (
+export default ChatScreen;
+  
+    return (
     <div className="min-h-screen bg-background font-montserrat flex">
       {/* Sidebar con historial */}
       <div className="w-80 bg-card border-r border-border p-4 flex flex-col">
+        <div className="flex items-center justify-between mb-6">
             <Button
               onClick={onAdminPanel}
               variant="outline"
