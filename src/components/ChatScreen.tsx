@@ -630,7 +630,9 @@ useEffect(() => {
 };
 
   return (
-          <div className="w-80 bg-card border-r border-border p-4 flex flex-col">
+    <div className="min-h-screen bg-background font-montserrat flex">
+      {/* Sidebar con historial */}
+      <div className="w-80 bg-card border-r border-border p-4 flex flex-col">
         <div className="flex items-center justify-between mb-6">
           <h3 className="font-semibold text-foreground">Historial</h3>
           <div className="flex gap-2">
