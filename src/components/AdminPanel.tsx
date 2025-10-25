@@ -4,16 +4,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Copy, Download, User, MessageSquare, Calendar, Database } from "lucide-react";
+import { ArrowLeft, Copy, Download, User, MessageSquare, Calendar, Database, LogOut } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { getAppMode } from "@/lib/appMode";
 import { getLegacyHistory, getChatHistory, getUserEmail, type MockHistory, type ChatMessage } from "@/lib/localStorage";
 
 interface AdminPanelProps {
   onBack: () => void;
+  onLogout: () => void; // ✅ AGREGADA: Prop para cerrar sesión
 }
 
-const AdminPanel = ({ onBack }: AdminPanelProps) => {
+const AdminPanel = ({ onBack, onLogout }: AdminPanelProps) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'sessions' | 'logs'>('overview');
   const [legacyHistory, setLegacyHistory] = useState<MockHistory[]>([]);
   const [currentChat, setCurrentChat] = useState<ChatMessage[]>([]);
@@ -109,6 +110,17 @@ const AdminPanel = ({ onBack }: AdminPanelProps) => {
             <Badge variant="outline">
               {userEmail}
             </Badge>
+            {/* ✅ BOTÓN DE LOGOUT AGREGADO */}
+            <Button
+              onClick={onLogout}
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              title="Cerrar sesión"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Cerrar sesión
+            </Button>
           </div>
         </div>
 
@@ -307,3 +319,4 @@ const AdminPanel = ({ onBack }: AdminPanelProps) => {
 };
 
 export default AdminPanel;
+
