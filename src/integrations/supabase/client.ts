@@ -23,11 +23,3 @@ export const supabase = createClient(
     }
   }
 );
-
-
-
-
-
-
-
-
