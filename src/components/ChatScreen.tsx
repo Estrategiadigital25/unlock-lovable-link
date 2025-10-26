@@ -1202,4 +1202,3 @@ ${messages.map(msg =>
 };
 
 export default ChatScreen;
-
