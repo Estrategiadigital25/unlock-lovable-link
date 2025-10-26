@@ -319,4 +319,3 @@ const AdminPanel = ({ onBack, onLogout }: AdminPanelProps) => {
 };
 
 export default AdminPanel;
-
