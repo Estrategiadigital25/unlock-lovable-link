@@ -86,3 +86,4 @@ export default function App() {
 
   return <ChatScreen onAdminPanel={handleAdminPanel} onLogout={handleLogout} />;
 }
+
