@@ -80,7 +80,8 @@ export default function App() {
 
   // Si está autenticado, mostrar las pantallas correspondientes
   if (currentScreen === 'admin') {
-    return <AdminPanel onBack={handleBackToChat} />;
+    return <AdminPanel onBack={handleBackToChat} onLogout={handleLogout} />;
+    //                                            ^^^^^^^^^^^^^^^^^^^^^ ✅ AGREGADO
   }
 
   return <ChatScreen onAdminPanel={handleAdminPanel} onLogout={handleLogout} />;
