@@ -30,6 +30,7 @@ export const AUTHORIZED_EMAILS = [
   'laboratorio3@iespecialidades.com',
   'laboratorio9@iespecialidades.com',
   'laboratorio6@iespecialidades.com',
+  'catalina.ospina@iespecialidades.com',
   'operaciones@iespecialidades.com',
   'laboratorio5@iespecialidades.com',
   'powerbi@iespecialidades.com',
@@ -40,11 +41,8 @@ export const AUTHORIZED_EMAILS = [
   'wilmer.pinzon@iespecialidades.com',
   'liderformuladores@iespecialidades.com',
   'lorena.hurtado@iespecialidades.com',
-  'prueba@iespecialidades.com',
-  'angie.loaiza@iespecialidades.com',
-  'catalina.ospina@iespecialidades.com',
-
-
+  'prueba@iespecialidades.com', // ✅ COMA AGREGADA AQUÍ
+  'angie.loaiza@iespecialidades.com'
 ];
 
 const LoginScreen = ({ onLogin }: LoginScreenProps) => {
@@ -272,5 +270,4 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
 };
 
 export default LoginScreen;
-
 
