@@ -20,7 +20,7 @@ import GPTImportExport from "@/components/GPTImportExport";
 
 interface ChatScreenProps {
   onAdminPanel: () => void;
-  onLogout: () => void; // ✅ AGREGADA: Prop para manejar logout
+  onLogout: () => void;
 }
 
 interface Message {
@@ -93,7 +93,6 @@ const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  // GPT principal para todas las búsquedas
   const defaultGPTs: CustomGPT[] = [
     {
       id: 'gpt4',
@@ -105,7 +104,6 @@ const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
     }
   ];
 
-  // Cargar datos del localStorage al iniciar
   useEffect(() => {
     const savedConversations = localStorage.getItem('conversations');
     const savedGPTs = localStorage.getItem('custom_gpts');
@@ -135,7 +133,6 @@ const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
       }
     }
 
-    // Cargar preguntas del historial para habilitar el botón
     try {
       const hist = JSON.parse(localStorage.getItem('historialGPT') || '[]');
       setHistorialBusquedas(Array.isArray(hist) ? hist.map((i: any) => i.pregunta) : []);
@@ -144,13 +141,11 @@ const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
     }
   }, []);
 
-  // Generar título automático basado en el primer mensaje
   const generateAutoTitle = (firstMessage: string): string => {
     const words = firstMessage.trim().split(' ').slice(0, 6);
     return words.join(' ') + (firstMessage.split(' ').length > 6 ? '...' : '');
   };
 
-  // Guardar conversación actual
   const saveCurrentConversation = () => {
     if (messages.length === 0) return;
 
@@ -158,7 +153,6 @@ const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
     let conversation: Conversation;
 
     if (currentConversationId) {
-      // Actualizar conversación existente
       conversation = {
         id: currentConversationId,
         title: conversations.find(c => c.id === currentConversationId)?.title || generateAutoTitle(messages[0]?.content || ''),
@@ -167,7 +161,6 @@ const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
         updatedAt: now
       };
     } else {
-      // Crear nueva conversación
       conversation = {
         id: Date.now().toString(),
         title: generateAutoTitle(messages[0]?.content || 'Nueva conversación'),
@@ -185,12 +178,10 @@ const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
   };
 
   const handleNewSearch = () => {
-    // Guardar conversación actual si existe
     if (messages.length > 0) {
       saveCurrentConversation();
     }
 
-    // Limpiar chat actual
     setMessages([]);
     setAttachments([]);
     setInputValue('');
@@ -204,9 +195,7 @@ const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
     });
   };
 
-  // Cargar una conversación existente
   const loadConversation = (conversationId: string) => {
-    // Guardar conversación actual antes de cargar otra
     if (messages.length > 0 && currentConversationId !== conversationId) {
       saveCurrentConversation();
     }
@@ -225,13 +214,11 @@ const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
     }
   };
 
-  // Eliminar conversación
   const deleteConversation = (conversationId: string) => {
     const updatedConversations = conversations.filter(c => c.id !== conversationId);
     setConversations(updatedConversations);
     localStorage.setItem('conversations', JSON.stringify(updatedConversations));
     
-    // Si se elimina la conversación actual, limpiar el chat
     if (currentConversationId === conversationId) {
       setMessages([]);
       setCurrentConversationId(null);
@@ -243,7 +230,6 @@ const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
     });
   };
 
-  // Editar título de conversación
   const startEditingTitle = (conversationId: string, currentTitle: string) => {
     setEditingTitleId(conversationId);
     setEditingTitleValue(currentTitle);
@@ -276,14 +262,12 @@ const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
     setEditingTitleValue('');
   };
 
-  // Limpiar historial
   const clearHistory = () => {
     setConversations([]);
     setHistorialBusquedas([]);
     localStorage.removeItem('conversations');
     localStorage.removeItem('historialGPT');
     
-    // También limpiar chat actual
     setMessages([]);
     setCurrentConversationId(null);
     
@@ -293,97 +277,92 @@ const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
     });
   };
 
-  // Manejo de archivos adjuntos
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const files = e.target.files;
-  if (!files || files.length === 0) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-  const PRESIGNED_URL_ENDPOINT = import.meta.env.VITE_PRESIGNED_URL_ENDPOINT;
-  
-  if (!PRESIGNED_URL_ENDPOINT) {
+    const PRESIGNED_URL_ENDPOINT = import.meta.env.VITE_PRESIGNED_URL_ENDPOINT;
+    
+    if (!PRESIGNED_URL_ENDPOINT) {
+      toast({
+        title: "Error de configuración",
+        description: "No se ha configurado el endpoint para subir archivos",
+        variant: "destructive"
+      });
+      return;
+    }
+
     toast({
-      title: "Error de configuración",
-      description: "No se ha configurado el endpoint para subir archivos",
-      variant: "destructive"
+      title: "Subiendo archivos",
+      description: `Subiendo ${files.length} archivo(s)...`,
     });
-    return;
-  }
 
-  toast({
-    title: "Subiendo archivos",
-    description: `Subiendo ${files.length} archivo(s)...`,
-  });
+    try {
+      const uploadPromises = Array.from(files).map(async (file) => {
+        const response = await fetch(PRESIGNED_URL_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size,
+            userEmail: userEmail || 'anonymous',
+          }),
+        });
 
-  try {
-    const uploadPromises = Array.from(files).map(async (file) => {
-      // 1. Solicitar presigned URL
-      const response = await fetch(PRESIGNED_URL_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size,
-          userEmail: userEmail || 'anonymous',
-        }),
+        if (!response.ok) {
+          throw new Error(`Error al obtener URL de subida: ${response.statusText}`);
+        }
+
+        const { uploadUrl, fileKey, accessUrl } = await response.json();
+
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type },
+          body: file,
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error(`Error al subir archivo: ${uploadResponse.statusText}`);
+        }
+
+        return {
+          id: Date.now().toString() + Math.random(),
+          name: file.name,
+          type: file.type.startsWith('image/') ? 'image' as const :
+                file.type === 'application/pdf' ? 'pdf' as const : 'document' as const,
+          url: accessUrl,
+          size: file.size,
+          fileKey: fileKey,
+        };
       });
 
-      if (!response.ok) {
-        throw new Error(`Error al obtener URL de subida: ${response.statusText}`);
-      }
+      const uploadedAttachments = await Promise.all(uploadPromises);
+      setAttachments([...attachments, ...uploadedAttachments]);
 
-      const { uploadUrl, fileKey, accessUrl } = await response.json();
-
-      // 2. Subir archivo a S3
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type },
-        body: file,
+      toast({
+        title: "Archivos subidos",
+        description: `Se han subido ${uploadedAttachments.length} archivo(s) correctamente`,
       });
 
-      if (!uploadResponse.ok) {
-        throw new Error(`Error al subir archivo: ${uploadResponse.statusText}`);
-      }
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      toast({
+        title: "Error al subir archivos",
+        description: error instanceof Error ? error.message : "Error desconocido",
+        variant: "destructive"
+      });
+    }
 
-      // 3. Retornar información del archivo
-      return {
-        id: Date.now().toString() + Math.random(),
-        name: file.name,
-        type: file.type.startsWith('image/') ? 'image' as const :
-              file.type === 'application/pdf' ? 'pdf' as const : 'document' as const,
-        url: accessUrl,
-        size: file.size,
-        fileKey: fileKey,
-      };
-    });
-
-    const uploadedAttachments = await Promise.all(uploadPromises);
-    setAttachments([...attachments, ...uploadedAttachments]);
-
-    toast({
-      title: "Archivos subidos",
-      description: `Se han subido ${uploadedAttachments.length} archivo(s) correctamente`,
-    });
-
-  } catch (error) {
-    console.error('Error uploading files:', error);
-    toast({
-      title: "Error al subir archivos",
-      description: error instanceof Error ? error.message : "Error desconocido",
-      variant: "destructive"
-    });
-  }
-
-  if (fileInputRef.current) {
-    fileInputRef.current.value = '';
-  }
-};
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const removeAttachment = (attachmentId: string) => {
     setAttachments(attachments.filter(att => att.id !== attachmentId));
   };
 
-  // Copiar conversación
   const copyConversation = () => {
     const conversationText = messages.map(msg =>
       `${msg.type === 'user' ? 'Usuario' : 'Asistente'}: ${msg.content}`
@@ -396,7 +375,6 @@ const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
     });
   };
 
-  // Descargar conversación
   const downloadConversation = async (format: 'txt' | 'docx' | 'pdf') => {
     const conversationData = {
       fecha: new Date().toLocaleDateString('es-ES'),
@@ -436,8 +414,6 @@ ${messages.map(msg =>
       });
     } else if (format === 'docx') {
       try {
-        console.log('Iniciando creación de documento DOCX...');
-        
         const children = [
           new Paragraph({
             children: [
@@ -491,9 +467,6 @@ ${messages.map(msg =>
           ])
         ];
 
-        console.log('Elementos creados:', children.length);
-
-        // Crear documento
         const doc = new Document({
           sections: [{
             properties: {},
@@ -501,9 +474,7 @@ ${messages.map(msg =>
           }],
         });
 
-        console.log('Documento creado, generando blob...');
         const blob = await Packer.toBlob(doc);
-        console.log('Blob generado, tamaño:', blob.size);
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -513,7 +484,6 @@ ${messages.map(msg =>
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        console.log('Descarga iniciada exitosamente');
         toast({
           title: "Descarga completada",
           description: "La conversación se ha descargado como archivo .docx",
@@ -531,7 +501,6 @@ ${messages.map(msg =>
         const pdf = new jsPDF();
         let yPosition = 20;
         
-        // Encabezado
         pdf.setFontSize(14);
         pdf.setFont('helvetica', 'bold');
         pdf.text(`Conversación - ${conversationData.fecha}`, 10, yPosition);
@@ -579,7 +548,6 @@ ${messages.map(msg =>
     }
   };
 
-  // Crear nuevo GPT
   const createCustomGPT = () => {
     if (!newGPTName.trim() || !newGPTInstructions.trim()) {
       toast({
@@ -618,117 +586,47 @@ ${messages.map(msg =>
   };
 
   const handleSendMessage = async () => {
-  if (!inputValue.trim()) return;
+    if (!inputValue.trim()) return;
 
-  // 1) Mensaje del usuario
-  const userMessage: Message = {
-    id: Date.now().toString(),
-    type: 'user',
-    content: inputValue,
-    timestamp: new Date(),
-    attachments: attachments.length > 0 ? [...attachments] : undefined,
-    gptUsed: 'Usuario'
-  };
-
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    toast({
-      title: 'Error',
-      description: `No se pudo enviar el mensaje: ${msg}`,
-      variant: 'destructive',
-    });
-
-    setAttachments(currentAttachments);
-  }
-};
-
-  const removeAttachment = (attachmentId: string) => {
-    setAttachments(attachments.filter(att => att.id !== attachmentId));
-  };
-
-  // Guardar adjuntos antes de limpiar
-  const currentAttachments = [...attachments];
-  
-  // limpiar input/adjuntos
-  setInputValue('');
-  setAttachments([]);
-
-  // 2) (solo etiqueta/UX)
-  const finalMode = mode === 'AUTO' ? detectMode(userMessage.content) : mode;
-
-  // 3) Historial para tu API - INCLUIR ATTACHMENTS
-  const historyForApi: ChatMessage[] = updatedMessages.map((m) => {
-    const chatMsg: ChatMessage = {
-      role: m.type === 'assistant' ? 'assistant' : 'user',
-      content: m.content,
-    };
-
-    // ✅ NUEVO: Si el mensaje tiene archivos adjuntos, incluirlos
-    if (m.attachments && m.attachments.length > 0) {
-      chatMsg.attachments = m.attachments.map(att => ({
-        fileName: att.name,
-        fileType: att.type,
-        fileKey: (att as any).fileKey || '',
-      }));
-    }
-
-    return chatMsg;
-  });
-
-  try {
-    // 4) Llamada real a tu backend (API Gateway -> Lambda)
-    const replyText = await askChat(historyForApi, "gpt-4o-mini");
-
-    // 5) Mensaje del asistente
-    const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      type: 'assistant',
-      content: replyText,
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      type: 'user',
+      content: inputValue,
       timestamp: new Date(),
-      gptUsed: finalMode === 'SIN ASISTENTE' ? 'ChatGPT' : 'Asistente Ingtec'
+      attachments: attachments.length > 0 ? [...attachments] : undefined,
+      gptUsed: 'Usuario'
     };
-
-    setMessages((prev) => [...prev, assistantMessage]);
-
-    // 6) Auto-guardar
-    setTimeout(() => {
-      saveCurrentConversation();
-    }, 100);
-
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    toast({
-      title: 'Error',
-      description: `No se pudo enviar el mensaje: ${msg}`,
-      variant: 'destructive',
-    });
-
-    // Restaurar adjuntos si falla
-    setAttachments(currentAttachments);
-  }
-};
 
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
 
-    // limpiar input/adjuntos
+    const currentAttachments = [...attachments];
+    
     setInputValue('');
     setAttachments([]);
 
-    // 2) (solo etiqueta/UX)
     const finalMode = mode === 'AUTO' ? detectMode(userMessage.content) : mode;
 
-    // 3) Historial para tu API
-    const historyForApi: ChatMessage[] = updatedMessages.map((m) => ({
-      role: m.type === 'assistant' ? 'assistant' : 'user',
-      content: m.content,
-    }));
+    const historyForApi: ChatMessage[] = updatedMessages.map((m) => {
+      const chatMsg: ChatMessage = {
+        role: m.type === 'assistant' ? 'assistant' : 'user',
+        content: m.content,
+      };
+
+      if (m.attachments && m.attachments.length > 0) {
+        chatMsg.attachments = m.attachments.map(att => ({
+          fileName: att.name,
+          fileType: att.type,
+          fileKey: (att as any).fileKey || '',
+        }));
+      }
+
+      return chatMsg;
+    });
 
     try {
-      // 4) Llamada real a tu backend (API Gateway -> Lambda)
       const replyText = await askChat(historyForApi, "gpt-4o-mini");
 
-      // 5) Mensaje del asistente
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
@@ -739,27 +637,24 @@ ${messages.map(msg =>
 
       setMessages((prev) => [...prev, assistantMessage]);
 
-      // 6) Auto-guardar
       setTimeout(() => {
         saveCurrentConversation();
       }, 100);
 
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: `❌ Error al conectar con el servidor.\n\n${msg}`,
-        timestamp: new Date(),
-        gptUsed: "Error"
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      toast({
+        title: 'Error',
+        description: `No se pudo enviar el mensaje: ${msg}`,
+        variant: 'destructive',
+      });
+
+      setAttachments(currentAttachments);
     }
   };
 
   return (
     <div className="min-h-screen bg-background font-montserrat flex">
-      {/* Sidebar con historial */}
       <div className="w-80 bg-card border-r border-border p-4 flex flex-col">
         <div className="flex items-center justify-between mb-6">
           <h3 className="font-semibold text-foreground">Historial</h3>
@@ -772,7 +667,6 @@ ${messages.map(msg =>
             >
               <Settings className="h-4 w-4" />
             </Button>
-            {/* ✅ BOTÓN DE LOGOUT AGREGADO */}
             <Button
               onClick={onLogout}
               variant="outline"
@@ -855,7 +749,6 @@ ${messages.map(msg =>
           </div>
         </ScrollArea>
         
-        {/* GPTs Personalizados */}
         {customGPTs.length > 0 && (
           <div className="mb-4">
             <h4 className="text-sm font-medium text-foreground mb-2">Mis GPTs</h4>
@@ -922,61 +815,54 @@ ${messages.map(msg =>
                               setCustomGPTs(updatedGPTs);
                               localStorage.setItem('custom_gpts', JSON.stringify(updatedGPTs));
                             }}
+                            rows={5}
                           />
                         </div>
+                        <Button 
+                          variant="destructive" 
+                          onClick={() => {
+                            const updatedGPTs = customGPTs.filter(g => g.id !== gpt.id);
+                            setCustomGPTs(updatedGPTs);
+                            localStorage.setItem('custom_gpts', JSON.stringify(updatedGPTs));
+                            if (selectedGPT === gpt.id) {
+                              setSelectedGPT('gpt4');
+                            }
+                            toast({
+                              title: "GPT eliminado",
+                              description: `Se ha eliminado el GPT "${gpt.name}".`,
+                            });
+                          }}
+                          className="w-full"
+                        >
+                          Eliminar GPT
+                        </Button>
                       </div>
                     </DialogContent>
                   </Dialog>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                    onClick={() => {
-                      const updatedGPTs = customGPTs.filter(g => g.id !== gpt.id);
-                      setCustomGPTs(updatedGPTs);
-                      localStorage.setItem('custom_gpts', JSON.stringify(updatedGPTs));
-                      if (selectedGPT === gpt.id) {
-                        setSelectedGPT('gpt4');
-                      }
-                      toast({
-                        title: "GPT eliminado",
-                        description: `Se ha eliminado el GPT "${gpt.name}".`,
-                      });
-                    }}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Botón limpiar historial */}
-        <div className="mt-4 pt-4 border-border">
-          <Button
-            onClick={clearHistory}
-            variant="outline"
-            size="sm"
-            className="w-full border-2 text-white hover:opacity-90"
-            style={{ backgroundColor: '#a7db74', borderColor: '#a7db74' }}
-            disabled={conversations.length === 0 && historialBusquedas.length === 0}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Limpiar historial local
-          </Button>
-        </div>
+        <Separator className="my-4" />
+
+        <Button
+          onClick={clearHistory}
+          variant="outline"
+          size="sm"
+          className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Limpiar Historial
+        </Button>
       </div>
 
-      {/* Área principal del chat */}
       <div className="flex-1 flex flex-col">
-        {/* Header */}
         <div className="bg-card border-b border-border p-6 text-center">
           <div className="flex items-center justify-center gap-3 mb-2">
-            <div>
-              <img src="/lovable-uploads/4c7e0a4b-080a-437a-b8e8-bb34ebe70495.png" alt="Ingtec Logo" className="w-12 h-12" />
-            </div>
-            <h1 className="text-3xl font-bold text-foreground">
+            <img src="/logo-ingtec.svg" alt="Logo" className="h-8" />
+            <h1 className="text-2xl font-bold text-primary">
               Buscador GPT
             </h1>
           </div>
@@ -988,7 +874,6 @@ ${messages.map(msg =>
           </p>
         </div>
 
-        {/* Área de mensajes */}
         <ScrollArea className="flex-1 p-6">
           <div className="max-w-4xl mx-auto space-y-6">
             {messages.length === 0 && (
@@ -1035,10 +920,8 @@ ${messages.map(msg =>
           </div>
         </ScrollArea>
 
-        {/* Área de entrada y botones */}
         <div className="bg-card border-t border-border p-6">
           <div className="max-w-4xl mx-auto space-y-4">
-            {/* Selector de GPT y Crear GPT */}
             <div className="flex gap-4 items-center">
               <div className="flex-1">
                 <Select value={selectedGPT} onValueChange={setSelectedGPT}>
@@ -1080,7 +963,6 @@ ${messages.map(msg =>
                   </Button>
                 </DialogTrigger>
                 
-              {/* Import/Export GPTs */}
               <GPTImportExport 
                 customGPTs={customGPTs} 
                 onGPTsUpdated={setCustomGPTs} 
@@ -1090,7 +972,6 @@ ${messages.map(msg =>
                     <DialogTitle>Crear GPT Personalizado</DialogTitle>
                   </DialogHeader>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Panel de configuración */}
                     <div className="space-y-4">
                       <h3 className="font-medium text-lg">Configuración</h3>
                       <div>
@@ -1119,7 +1000,6 @@ ${messages.map(msg =>
                         />
                       </div>
                       
-                      {/* Área de archivos */}
                       <div>
                         <label className="text-sm font-medium">Archivos de entrenamiento</label>
                         <TrainingFilesDropzone
@@ -1155,7 +1035,6 @@ ${messages.map(msg =>
                       </div>
                     </div>
                     
-                    {/* Panel de pruebas */}
                     <div className="space-y-4">
                       <h3 className="font-medium text-lg">Probar funcionalidad</h3>
                       <div>
@@ -1207,7 +1086,6 @@ ${messages.map(msg =>
               </Dialog>
             </div>
 
-            {/* Controles Asistente Ingtec */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
               <div>
                 <label className="text-sm font-medium">Modo</label>
@@ -1225,7 +1103,6 @@ ${messages.map(msg =>
               </div>
             </div>
 
-            {/* Archivos adjuntos */}
             {attachments.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm font-medium">Archivos adjuntos:</p>
@@ -1248,7 +1125,6 @@ ${messages.map(msg =>
               </div>
             )}
 
-            {/* Botones de acción */}
             <div className="flex flex-wrap gap-2 justify-center">
               <Button 
                 variant="outline" 
@@ -1290,7 +1166,6 @@ ${messages.map(msg =>
 
             <Separator />
 
-            {/* Botón Nueva búsqueda */}
             <div className="flex justify-center">
               <Button
                 variant="outline"
@@ -1305,7 +1180,6 @@ ${messages.map(msg =>
 
             <Separator />
 
-            {/* Campo de entrada con botón de archivos */}
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -1350,3 +1224,4 @@ ${messages.map(msg =>
 };
 
 export default ChatScreen;
+
