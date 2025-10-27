@@ -46,6 +46,7 @@ interface Attachment {
   type: 'image' | 'document' | 'pdf';
   url: string;
   size: number;
+  fileKey?: string;
 }
 
 interface CustomGPT {
@@ -293,21 +294,90 @@ const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
   };
 
   // Manejo de archivos adjuntos
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = e.target.files;
+  if (!files || files.length === 0) return;
 
-    const newAttachments: Attachment[] = Array.from(files).map(file => ({
-      id: Date.now().toString() + Math.random(),
-      name: file.name,
-      type: file.type.startsWith('image/') ? 'image' : 
-            file.type === 'application/pdf' ? 'pdf' : 'document',
-      url: URL.createObjectURL(file),
-      size: file.size
-    }));
+  const PRESIGNED_URL_ENDPOINT = import.meta.env.VITE_PRESIGNED_URL_ENDPOINT;
+  
+  if (!PRESIGNED_URL_ENDPOINT) {
+    toast({
+      title: "Error de configuración",
+      description: "No se ha configurado el endpoint para subir archivos",
+      variant: "destructive"
+    });
+    return;
+  }
 
-    setAttachments([...attachments, ...newAttachments]);
-  };
+  toast({
+    title: "Subiendo archivos",
+    description: `Subiendo ${files.length} archivo(s)...`,
+  });
+
+  try {
+    const uploadPromises = Array.from(files).map(async (file) => {
+      // 1. Solicitar presigned URL
+      const response = await fetch(PRESIGNED_URL_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          userEmail: userEmail || 'anonymous',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error al obtener URL de subida: ${response.statusText}`);
+      }
+
+      const { uploadUrl, fileKey, accessUrl } = await response.json();
+
+      // 2. Subir archivo a S3
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Error al subir archivo: ${uploadResponse.statusText}`);
+      }
+
+      // 3. Retornar información del archivo
+      return {
+        id: Date.now().toString() + Math.random(),
+        name: file.name,
+        type: file.type.startsWith('image/') ? 'image' as const :
+              file.type === 'application/pdf' ? 'pdf' as const : 'document' as const,
+        url: accessUrl,
+        size: file.size,
+        fileKey: fileKey,
+      };
+    });
+
+    const uploadedAttachments = await Promise.all(uploadPromises);
+    setAttachments([...attachments, ...uploadedAttachments]);
+
+    toast({
+      title: "Archivos subidos",
+      description: `Se han subido ${uploadedAttachments.length} archivo(s) correctamente`,
+    });
+
+  } catch (error) {
+    console.error('Error uploading files:', error);
+    toast({
+      title: "Error al subir archivos",
+      description: error instanceof Error ? error.message : "Error desconocido",
+      variant: "destructive"
+    });
+  }
+
+  if (fileInputRef.current) {
+    fileInputRef.current.value = '';
+  }
+};
 
   const removeAttachment = (attachmentId: string) => {
     setAttachments(attachments.filter(att => att.id !== attachmentId));
@@ -548,17 +618,82 @@ ${messages.map(msg =>
   };
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim()) return;
+  if (!inputValue.trim()) return;
 
-    // 1) Mensaje del usuario
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      type: 'user',
-      content: inputValue,
-      timestamp: new Date(),
-      attachments: attachments.length > 0 ? [...attachments] : undefined,
-      gptUsed: 'Usuario'
+  // 1) Mensaje del usuario
+  const userMessage: Message = {
+    id: Date.now().toString(),
+    type: 'user',
+    content: inputValue,
+    timestamp: new Date(),
+    attachments: attachments.length > 0 ? [...attachments] : undefined,
+    gptUsed: 'Usuario'
+  };
+
+  const updatedMessages = [...messages, userMessage];
+  setMessages(updatedMessages);
+
+  // Guardar adjuntos antes de limpiar
+  const currentAttachments = [...attachments];
+  
+  // limpiar input/adjuntos
+  setInputValue('');
+  setAttachments([]);
+
+  // 2) (solo etiqueta/UX)
+  const finalMode = mode === 'AUTO' ? detectMode(userMessage.content) : mode;
+
+  // 3) Historial para tu API - INCLUIR ATTACHMENTS
+  const historyForApi: ChatMessage[] = updatedMessages.map((m) => {
+    const chatMsg: ChatMessage = {
+      role: m.type === 'assistant' ? 'assistant' : 'user',
+      content: m.content,
     };
+
+    // ✅ NUEVO: Si el mensaje tiene archivos adjuntos, incluirlos
+    if (m.attachments && m.attachments.length > 0) {
+      chatMsg.attachments = m.attachments.map(att => ({
+        fileName: att.name,
+        fileType: att.type,
+        fileKey: (att as any).fileKey || '',
+      }));
+    }
+
+    return chatMsg;
+  });
+
+  try {
+    // 4) Llamada real a tu backend (API Gateway -> Lambda)
+    const replyText = await askChat(historyForApi, "gpt-4o-mini");
+
+    // 5) Mensaje del asistente
+    const assistantMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      type: 'assistant',
+      content: replyText,
+      timestamp: new Date(),
+      gptUsed: finalMode === 'SIN ASISTENTE' ? 'ChatGPT' : 'Asistente Ingtec'
+    };
+
+    setMessages((prev) => [...prev, assistantMessage]);
+
+    // 6) Auto-guardar
+    setTimeout(() => {
+      saveCurrentConversation();
+    }, 100);
+
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    toast({
+      title: 'Error',
+      description: `No se pudo enviar el mensaje: ${msg}`,
+      variant: 'destructive',
+    });
+
+    // Restaurar adjuntos si falla
+    setAttachments(currentAttachments);
+  }
+};
 
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
