@@ -630,8 +630,21 @@ ${messages.map(msg =>
     gptUsed: 'Usuario'
   };
 
-  const updatedMessages = [...messages, userMessage];
-  setMessages(updatedMessages);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    toast({
+      title: 'Error',
+      description: `No se pudo enviar el mensaje: ${msg}`,
+      variant: 'destructive',
+    });
+
+    setAttachments(currentAttachments);
+  }
+};
+
+  const removeAttachment = (attachmentId: string) => {
+    setAttachments(attachments.filter(att => att.id !== attachmentId));
+  };
 
   // Guardar adjuntos antes de limpiar
   const currentAttachments = [...attachments];
