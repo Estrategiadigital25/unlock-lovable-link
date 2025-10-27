@@ -31,7 +31,8 @@ export async function chat(messages: { role: string; content: string }[]) {
 
   // Llamada real a OpenAI
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const chatEndpoint = import.meta.env.VITE_CHAT_ENDPOINT || 'https://5wqjfo563vefroezns5ldqhkpq0hqmzd.lambda-url.us-east-1.on.aws';
+   const response = await fetch(chatEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
