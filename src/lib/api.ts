@@ -2,8 +2,13 @@
 // Versión con OpenAI API integrada
 
 export interface ChatMessage {
-  role: string;
+  role: 'user' | 'assistant' | 'system';
   content: string;
+  attachments?: Array<{
+    fileName: string;
+    fileType: string;
+    fileKey: string;
+  }>;
 }
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || '';
