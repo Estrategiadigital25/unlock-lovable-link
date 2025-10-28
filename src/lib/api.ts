@@ -72,6 +72,11 @@ export async function chat(messages: ChatMessage[]): Promise<ChatResponse> {
 }
 
 /**
+ * Alias de la función chat para compatibilidad con código antiguo
+ */
+export const askChat = chat;
+
+/**
  * Función para generar presigned URLs para subir archivos a S3
  */
 export async function generatePresignedUrl(
