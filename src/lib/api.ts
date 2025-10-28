@@ -1,5 +1,4 @@
 // src/lib/api.ts
-// Versión con OpenAI API integrada
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -11,63 +10,139 @@ export interface ChatMessage {
   }>;
 }
 
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || '';
-
-export async function ping() {
-  return { ok: true };
+export interface ChatResponse {
+  reply: string;
+  model?: string;
+  usage?: any;
 }
 
-export async function chat(messages: { role: string; content: string }[]) {
-  // Si no hay API key, usar modo demo
-  if (!OPENAI_API_KEY || OPENAI_API_KEY.trim() === '') {
-    console.log('OpenAI API key not found, using demo mode');
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    return {
-      reply: "¡Hola! Soy tu asistente de Ingtec Especialidades. " +
-             "(Nota: Actualmente en modo demo. Configura VITE_OPENAI_API_KEY para usar GPT real)"
-    };
+/**
+ * Función principal para enviar mensajes al chat
+ * Usa la Lambda configurada en VITE_CHAT_ENDPOINT
+ */
+export async function chat(messages: ChatMessage[]): Promise<ChatResponse> {
+  const CHAT_ENDPOINT = import.meta.env.VITE_CHAT_ENDPOINT;
+  
+  // Si no hay endpoint configurado, mostrar mensaje de error
+  if (!CHAT_ENDPOINT) {
+    console.error('VITE_CHAT_ENDPOINT no está configurado');
+    throw new Error('Endpoint del chat no configurado. Contacta al administrador.');
   }
 
-  // Llamada real a OpenAI
+  console.log('Enviando mensajes a Lambda:', CHAT_ENDPOINT);
+  console.log('Mensajes:', JSON.stringify(messages, null, 2));
+
   try {
-    const chatEndpoint = import.meta.env.VITE_CHAT_ENDPOINT || 'https://5wqjfo563vefroezns5ldqhkpq0hqmzd.lambda-url.us-east-1.on.aws';
-   const response = await fetch(chatEndpoint, {
+    const response = await fetch(CHAT_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: messages,
+        messages,
+        model: 'gpt-4o-mini',
         temperature: 0.7,
-        max_tokens: 1000
       })
     });
 
+    const text = await response.text();
+    console.log('Respuesta de Lambda (raw):', text);
+    
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || `HTTP ${response.status}`);
+      console.error('Error de Lambda:', response.status, text);
+      throw new Error(`Error del servidor: ${response.status}`);
     }
 
-    const data = await response.json();
-    
-    return {
-      reply: data.choices[0].message.content
-    };
+    let data: ChatResponse;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      console.error('Error al parsear JSON:', e);
+      console.error('Texto recibido:', text?.slice?.(0, 500));
+      throw new Error('Respuesta inválida del servidor');
+    }
+
+    console.log('Respuesta procesada:', data);
+    return data;
+
   } catch (error) {
-    console.error('Error calling OpenAI:', error);
-    
-    // Fallback a modo demo si hay error
-    return {
-      reply: "Lo siento, hay un problema con la conexión a OpenAI. " +
-             "Por favor, verifica tu API key o contacta al administrador."
-    };
+    console.error('Error en función chat():', error);
+    throw error;
   }
 }
 
-export async function askChat(messages: ChatMessage[], model?: string) {
-  const response = await chat(messages);
-  return response.reply || response;
+/**
+ * Función para generar presigned URLs para subir archivos a S3
+ */
+export async function generatePresignedUrl(
+  fileName: string,
+  fileType: string,
+  fileSize: number,
+  userEmail?: string,
+  gptId?: string
+): Promise<{
+  uploadUrl: string;
+  accessUrl: string;
+  fileKey: string;
+  bucket: string;
+  expires: string;
+}> {
+  const PRESIGNED_URL_ENDPOINT = import.meta.env.VITE_PRESIGNED_URL_ENDPOINT;
+  
+  if (!PRESIGNED_URL_ENDPOINT) {
+    throw new Error('Endpoint de presigned URLs no configurado');
+  }
+
+  console.log('Generando presigned URL para:', fileName);
+
+  const response = await fetch(PRESIGNED_URL_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      fileName,
+      fileType,
+      fileSize,
+      userEmail,
+      gptId,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Error generando presigned URL:', errorText);
+    throw new Error('Error al generar URL de subida');
+  }
+
+  const data = await response.json();
+  console.log('Presigned URL generada:', data.fileKey);
+  
+  return data;
+}
+
+/**
+ * Función para subir un archivo a S3 usando presigned URL
+ */
+export async function uploadFileToS3(
+  file: File,
+  uploadUrl: string
+): Promise<void> {
+  console.log('Subiendo archivo a S3:', file.name);
+
+  const response = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': file.type,
+    },
+    body: file,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Error subiendo archivo a S3:', errorText);
+    throw new Error('Error al subir archivo');
+  }
+
+  console.log('Archivo subido exitosamente:', file.name);
 }
