@@ -625,12 +625,12 @@ ${messages.map(msg =>
     });
 
     try {
-      const replyText = await askChat(historyForApi, "gpt-4o-mini");
+      const response = await askChat(historyForApi);
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: replyText,
+        content: response.reply,
         timestamp: new Date(),
         gptUsed: finalMode === 'SIN ASISTENTE' ? 'ChatGPT' : 'Asistente Ingtec'
       };
