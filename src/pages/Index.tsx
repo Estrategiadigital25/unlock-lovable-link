@@ -24,8 +24,12 @@ const Index = () => {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
+  const handleLogout = () => {
+    setCurrentScreen('login');
+  };
+
   if (currentScreen === 'admin') {
-    return <AdminPanel onBack={handleBackToChat} />;
+    return <AdminPanel onBack={handleBackToChat} onLogout={handleLogout} />;
   }
 
   return <SimpleChatScreen onAdminPanel={handleAdminPanel} />;
