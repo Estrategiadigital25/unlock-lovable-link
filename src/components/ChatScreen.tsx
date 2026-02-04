@@ -361,44 +361,60 @@ const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
 
   const removeAttachment = (attachmentId: string) => {
     setAttachments(attachments.filter(att => att.id !== attachmentId));
+    toast({
+      title: "Archivo eliminado",
+      description: "El archivo ha sido removido de los adjuntos.",
+    });
   };
 
   const copyConversation = () => {
-    const conversationText = messages.map(msg =>
-      `${msg.type === 'user' ? 'Usuario' : 'Asistente'}: ${msg.content}`
-    ).join('\n\n');
+    const conversationData = {
+      fecha: new Date().toLocaleDateString('es-ES'),
+      gptUsado: [...defaultGPTs, ...customGPTs].find(g => g.id === selectedGPT)?.name || 'ChatGPT',
+      titulo: currentConversationId 
+        ? conversations.find(c => c.id === currentConversationId)?.title || 'Conversación actual'
+        : 'Conversación actual',
+      mensajes: messages.map(msg => ({
+        rol: msg.type === 'user' ? 'Usuario' : 'Asistente',
+        contenido: msg.content,
+        fecha: msg.timestamp.toLocaleString('es-ES')
+      }))
+    };
 
-    navigator.clipboard.writeText(conversationText);
+    const text = `Conversación - ${conversationData.fecha}
+GPT: ${conversationData.gptUsado}
+Título: ${conversationData.titulo}
+
+${'='.repeat(50)}
+
+${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.content}\n`).join('\n')}`;
+
+    navigator.clipboard.writeText(text);
     toast({
-      title: "Copiado",
-      description: "La conversación ha sido copiada al portapapeles",
+      title: "Conversación copiada",
+      description: "La conversación ha sido copiada al portapapeles.",
     });
   };
 
   const downloadConversation = async (format: 'txt' | 'docx' | 'pdf') => {
     const conversationData = {
       fecha: new Date().toLocaleDateString('es-ES'),
-      gptUsado: selectedGPT === 'gpt4' ? 'ChatGPT — Buscador Principal' : 
-                customGPTs.find(g => g.id === selectedGPT)?.name || 'GPT Desconocido',
+      gptUsado: [...defaultGPTs, ...customGPTs].find(g => g.id === selectedGPT)?.name || 'ChatGPT',
       titulo: currentConversationId 
-        ? conversations.find(c => c.id === currentConversationId)?.title || 'Sin título'
+        ? conversations.find(c => c.id === currentConversationId)?.title || 'Conversación actual'
         : 'Conversación actual'
     };
 
     if (format === 'txt') {
-      const content = `
-Conversación - ${conversationData.fecha}
+      const text = `Conversación - ${conversationData.fecha}
 GPT: ${conversationData.gptUsado}
 Título: ${conversationData.titulo}
 
 ${'='.repeat(50)}
 
-${messages.map(msg => 
-  `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.content}\n`
-).join('\n')}
-      `.trim();
-
-      const blob = new Blob([content], { type: 'text/plain' });
+${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.content}\n`).join('\n')}`;
+      
+      const blob = new Blob([text], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -417,16 +433,15 @@ ${messages.map(msg =>
         const children = [
           new Paragraph({
             children: [
-              new TextRun({ text: `Conversación - ${conversationData.fecha}`, bold: true, size: 28 }),
+              new TextRun({ 
+                text: `Conversación - ${conversationData.fecha}`, 
+                bold: true, 
+                size: 28 
+              }),
             ],
           }),
           new Paragraph({
             children: [new TextRun({ text: "" })],
-          }),
-          new Paragraph({
-            children: [
-              new TextRun({ text: `Fecha: ${conversationData.fecha}`, bold: true }),
-            ],
           }),
           new Paragraph({
             children: [
@@ -625,12 +640,12 @@ ${messages.map(msg =>
     });
 
     try {
-      const response = await askChat(historyForApi);
+      const replyText = await askChat(historyForApi, "gpt-4o-mini");
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: response.reply,
+        content: replyText,
         timestamp: new Date(),
         gptUsed: finalMode === 'SIN ASISTENTE' ? 'ChatGPT' : 'Asistente Ingtec'
       };
@@ -748,474 +763,404 @@ ${messages.map(msg =>
             )}
           </div>
         </ScrollArea>
-        
-        {customGPTs.length > 0 && (
-          <div className="mb-4">
-            <h4 className="text-sm font-medium text-foreground mb-2">Mis GPTs</h4>
-            <div className="space-y-2">
-              {customGPTs.map((gpt) => (
-                <div key={gpt.id} className="flex items-center gap-2">
-                  <Button
-                    variant={selectedGPT === gpt.id ? "default" : "outline"}
-                    size="sm"
-                    className="flex-1 justify-start text-left"
-                    onClick={() => setSelectedGPT(gpt.id)}
-                  >
-                    <span className="mr-2">{gpt.icon}</span>
-                    <div className="text-left">
-                      <div className="font-medium text-xs">{gpt.name}</div>
-                      <div className="text-xs text-muted-foreground line-clamp-1">{gpt.description}</div>
-                    </div>
-                  </Button>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <Edit className="h-3 w-3" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>Editar GPT</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-sm font-medium">Nombre</label>
-                          <Input 
-                            defaultValue={gpt.name}
-                            onChange={(e) => {
-                              const updatedGPTs = customGPTs.map(g => 
-                                g.id === gpt.id ? { ...g, name: e.target.value } : g
-                              );
-                              setCustomGPTs(updatedGPTs);
-                              localStorage.setItem('custom_gpts', JSON.stringify(updatedGPTs));
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium">Descripción</label>
-                          <Input 
-                            defaultValue={gpt.description}
-                            onChange={(e) => {
-                              const updatedGPTs = customGPTs.map(g => 
-                                g.id === gpt.id ? { ...g, description: e.target.value } : g
-                              );
-                              setCustomGPTs(updatedGPTs);
-                              localStorage.setItem('custom_gpts', JSON.stringify(updatedGPTs));
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium">Instrucciones</label>
-                          <Textarea 
-                            defaultValue={gpt.instructions}
-                            onChange={(e) => {
-                              const updatedGPTs = customGPTs.map(g => 
-                                g.id === gpt.id ? { ...g, instructions: e.target.value } : g
-                              );
-                              setCustomGPTs(updatedGPTs);
-                              localStorage.setItem('custom_gpts', JSON.stringify(updatedGPTs));
-                            }}
-                            rows={5}
-                          />
-                        </div>
-                        <Button 
-                          variant="destructive" 
-                          onClick={() => {
-                            const updatedGPTs = customGPTs.filter(g => g.id !== gpt.id);
-                            setCustomGPTs(updatedGPTs);
-                            localStorage.setItem('custom_gpts', JSON.stringify(updatedGPTs));
-                            if (selectedGPT === gpt.id) {
-                              setSelectedGPT('gpt4');
-                            }
-                            toast({
-                              title: "GPT eliminado",
-                              description: `Se ha eliminado el GPT "${gpt.name}".`,
-                            });
-                          }}
-                          className="w-full"
-                        >
-                          Eliminar GPT
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         <Separator className="my-4" />
+        
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium mb-2">Historial de búsquedas</h4>
+          <ScrollArea className="h-[calc(30vh-80px)]">
+            {historialBusquedas.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-4">
+                No hay búsquedas previas
+              </p>
+            ) : (
+              <div className="space-y-1">
+                {historialBusquedas.map((busqueda, index) => (
+                  <div 
+                    key={index} 
+                    className="text-xs p-2 rounded hover:bg-accent/50 cursor-pointer transition-colors"
+                    onClick={() => setInputValue(busqueda)}
+                  >
+                    {busqueda}
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </div>
 
-        <Button
-          onClick={clearHistory}
-          variant="outline"
-          size="sm"
-          className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
-        >
-          <Trash2 className="h-4 w-4 mr-2" />
-          Limpiar Historial
-        </Button>
+        <div className="mt-auto pt-4 space-y-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={clearHistory}
+            className="w-full"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Limpiar historial
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 flex flex-col">
-        <div className="bg-card border-b border-border p-6 text-center">
-          <div className="flex items-center justify-center gap-3 mb-2">
-            <img src="/logo-ingtec.svg" alt="Logo" className="h-8" />
-            <h1 className="text-2xl font-bold text-primary">
-              Buscador GPT
-            </h1>
+        <div className="bg-primary text-primary-foreground p-6 shadow-md">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-3xl font-bold mb-2">Buscador Ingtec</h1>
+            <p className="text-primary-foreground/80">
+              Búsqueda inteligente con ChatGPT - Versión Beta
+            </p>
           </div>
-          <div className="mb-2">
-            <Badge variant="secondary">Respaldado por la última versión de ChatGPT</Badge>
-          </div>
-          <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
-            Límite por usuario: 35 búsquedas diarias • 1.8MB de espacio • Las búsquedas se pueden guardar para no perder el historial
-          </p>
         </div>
 
-        <ScrollArea className="flex-1 p-6">
-          <div className="max-w-4xl mx-auto space-y-6">
-            {messages.length === 0 && (
-              <div className="text-center py-12">
-                <Bot className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-lg font-medium text-muted-foreground mb-2">
-                  ¡Hola! Soy tu asistente especializado
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Pregúntame sobre formulación, productos de limpieza, alimentos y laboratorio
-                </p>
-              </div>
-            )}
-            
-            {messages.map((message) => (
-              <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <Card className={`max-w-[80%] ${message.type === 'user' ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
-                  <CardContent className="p-4">
-                    {message.gptUsed && (
-                      <div className="flex items-center gap-2 mb-2 opacity-75">
-                        {message.type === 'user' ? <User className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
-                        <span className="text-xs">{message.gptUsed}</span>
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <ScrollArea className="flex-1 p-6">
+            <div className="max-w-4xl mx-auto space-y-6">
+              {messages.length === 0 ? (
+                <div className="text-center py-12">
+                  <Bot className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                  <h2 className="text-2xl font-semibold mb-2">¡Hola! ¿En qué puedo ayudarte hoy?</h2>
+                  <p className="text-muted-foreground">
+                    Haz una pregunta sobre productos, servicios o cualquier tema relacionado con Ingtec
+                  </p>
+                </div>
+              ) : (
+                messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex gap-4 ${
+                      message.type === 'user' ? 'justify-end' : 'justify-start'
+                    }`}
+                  >
+                    {message.type === 'assistant' && (
+                      <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                        <Bot className="h-6 w-6 text-primary-foreground" />
                       </div>
                     )}
-                    
-                    {message.attachments && message.attachments.length > 0 && (
-                      <div className="mb-3 space-y-2">
-                        {message.attachments.map((att) => (
-                          <div key={att.id} className="flex items-center gap-2 p-2 bg-background/20 rounded">
-                            {att.type === 'image' && <Image className="h-4 w-4" />}
-                            {att.type === 'document' && <FileText className="h-4 w-4" />}
-                            {att.type === 'pdf' && <FileText className="h-4 w-4" />}
-                            <span className="text-sm">{att.name}</span>
-                          </div>
-                        ))}
+                    <div
+                      className={`max-w-[70%] rounded-2xl px-4 py-3 ${
+                        message.type === 'user'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted'
+                      }`}
+                    >
+                      <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                      {message.attachments && message.attachments.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {message.attachments.map((att) => (
+                            <Badge key={att.id} variant="secondary" className="text-xs">
+                              {att.type === 'image' && <Image className="h-3 w-3 mr-1" />}
+                              {att.type === 'document' && <FileText className="h-3 w-3 mr-1" />}
+                              {att.type === 'pdf' && <FileText className="h-3 w-3 mr-1" />}
+                              {att.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-xs opacity-70 mt-2">
+                        {message.timestamp.toLocaleTimeString('es-ES', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </p>
+                    </div>
+                    {message.type === 'user' && (
+                      <div className="h-10 w-10 rounded-full bg-accent flex items-center justify-center flex-shrink-0">
+                        <User className="h-6 w-6" />
                       </div>
                     )}
-                    
-                    <p className="whitespace-pre-wrap">{message.content}</p>
-                  </CardContent>
-                </Card>
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
+                  </div>
+                ))
+              )}
+            </div>
+          </ScrollArea>
 
-        <div className="bg-card border-t border-border p-6">
-          <div className="max-w-4xl mx-auto space-y-4">
-            <div className="flex gap-4 items-center">
-              <div className="flex-1">
+          <div className="border-t border-border bg-card p-6">
+            <div className="max-w-4xl mx-auto space-y-4">
+              <div className="flex items-center justify-between">
                 <Select value={selectedGPT} onValueChange={setSelectedGPT}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecciona un GPT" />
+                  <SelectTrigger className="w-[300px]">
+                    <SelectValue placeholder="Seleccionar GPT" />
                   </SelectTrigger>
                   <SelectContent>
                     {defaultGPTs.map((gpt) => (
                       <SelectItem key={gpt.id} value={gpt.id}>
                         <div className="flex items-center gap-2">
                           <span>{gpt.icon}</span>
-                          <div>
-                            <div className="font-medium">{gpt.name}</div>
-                            <div className="text-sm text-muted-foreground">{gpt.description}</div>
-                          </div>
+                          <span>{gpt.name}</span>
                         </div>
                       </SelectItem>
                     ))}
-                    {customGPTs.map((gpt) => (
-                      <SelectItem key={gpt.id} value={gpt.id}>
-                        <div className="flex items-center gap-2">
-                          <span>{gpt.icon}</span>
-                          <div>
-                            <div className="font-medium">{gpt.name}</div>
-                            <div className="text-sm text-muted-foreground">{gpt.description}</div>
-                          </div>
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {customGPTs.length > 0 && (
+                      <>
+                        <Separator className="my-2" />
+                        {customGPTs.map((gpt) => (
+                          <SelectItem key={gpt.id} value={gpt.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{gpt.icon}</span>
+                              <span>{gpt.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
-              </div>
-              
-              <Dialog open={isCreatingGPT} onOpenChange={setIsCreatingGPT}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="rounded-[20px]">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Crear GPT
-                  </Button>
-                </DialogTrigger>
-                
-              <GPTImportExport 
-                customGPTs={customGPTs} 
-                onGPTsUpdated={setCustomGPTs} 
-              />
-                <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Crear GPT Personalizado</DialogTitle>
-                  </DialogHeader>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <h3 className="font-medium text-lg">Configuración</h3>
-                      <div>
-                        <label className="text-sm font-medium">Nombre *</label>
-                        <Input
-                          value={newGPTName}
-                          onChange={(e) => setNewGPTName(e.target.value)}
-                          placeholder="Ej: Experto en Cosméticos"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium">Descripción</label>
-                        <Input
-                          value={newGPTDescription}
-                          onChange={(e) => setNewGPTDescription(e.target.value)}
-                          placeholder="Breve descripción del GPT"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium">Instrucciones *</label>
-                        <Textarea
-                          value={newGPTInstructions}
-                          onChange={(e) => setNewGPTInstructions(e.target.value)}
-                          placeholder="Define el comportamiento y especialización del GPT..."
-                          rows={6}
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="text-sm font-medium">Archivos de entrenamiento</label>
-                        <TrainingFilesDropzone
-                          presignEndpoint={import.meta.env.VITE_PRESIGN_ENDPOINT || ""}
-                          onChange={setTrainingFiles}
-                          maxFiles={10}
-                          maxSizeMB={25}
-                          userEmail={userEmail || undefined}
-                          gptId={newGPTName ? `new-${newGPTName.toLowerCase().replace(/\s+/g, '-')}` : undefined}
-                        />
-                        {!import.meta.env.VITE_PRESIGN_ENDPOINT && (
-                          <p className="text-xs text-amber-600 mt-2">
-                            ⚠️ VITE_PRESIGN_ENDPOINT no configurado. Los archivos no se subirán.
-                          </p>
-                        )}
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => {
-                          setNewGPTName('');
-                          setNewGPTDescription('');
-                          setNewGPTInstructions('');
-                          setTestInput('');
-                          setTestOutput('');
-                          setTrainingFiles([]);
-                          setIsCreatingGPT(false);
-                        }} className="flex-1">
-                          Cancelar
-                        </Button>
-                        <Button onClick={createCustomGPT} className="flex-1">
-                          Crear GPT
-                        </Button>
-                      </div>
-                    </div>
+
+                <Dialog open={isCreatingGPT} onOpenChange={setIsCreatingGPT}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Crear GPT personalizado
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Crear GPT personalizado</DialogTitle>
+                    </DialogHeader>
                     
-                    <div className="space-y-4">
-                      <h3 className="font-medium text-lg">Probar funcionalidad</h3>
-                      <div>
-                        <label className="text-sm font-medium">Pregunta de prueba</label>
-                        <Textarea
-                          value={testInput}
-                          onChange={(e) => setTestInput(e.target.value)}
-                          placeholder="Escribe una pregunta para probar cómo respondería tu GPT..."
-                          rows={3}
-                        />
-                        <Button 
-                          size="sm" 
-                          className="mt-2 w-full"
-                          onClick={() => {
-                            if (testInput.trim() && newGPTInstructions.trim()) {
-                              setTestOutput(`GPT responde basado en: "${newGPTInstructions}"\n\nPregunta: ${testInput}\n\nRespuesta simulada: Esta sería la respuesta de tu GPT personalizado. En el entorno real, utilizaría las instrucciones proporcionadas para generar una respuesta especializada.`);
-                            } else {
-                              toast({
-                                title: "Error",
-                                description: "Agrega instrucciones y una pregunta de prueba",
-                                variant: "destructive"
-                              });
-                            }
-                          }}
-                        >
-                          Probar respuesta
-                        </Button>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium">Nombre del GPT</label>
+                          <Input
+                            value={newGPTName}
+                            onChange={(e) => setNewGPTName(e.target.value)}
+                            placeholder="Ej: Asistente de Ventas"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="text-sm font-medium">Descripción</label>
+                          <Input
+                            value={newGPTDescription}
+                            onChange={(e) => setNewGPTDescription(e.target.value)}
+                            placeholder="Breve descripción del propósito"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="text-sm font-medium">Instrucciones del sistema</label>
+                          <Textarea
+                            value={newGPTInstructions}
+                            onChange={(e) => setNewGPTInstructions(e.target.value)}
+                            placeholder="Define cómo debe comportarse este GPT..."
+                            rows={8}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Archivos de entrenamiento (opcional)</label>
+                          <TrainingFilesDropzone
+                            onFilesUploaded={(files) => setTrainingFiles(files)}
+                            existingFiles={trainingFiles}
+                          />
+                          {!import.meta.env.VITE_PRESIGNED_URL_ENDPOINT && (
+                            <p className="text-xs text-amber-600 mt-2">
+                              ⚠️ VITE_PRESIGN_ENDPOINT no configurado. Los archivos no se subirán.
+                            </p>
+                          )}
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <Button variant="outline" onClick={() => {
+                            setNewGPTName('');
+                            setNewGPTDescription('');
+                            setNewGPTInstructions('');
+                            setTestInput('');
+                            setTestOutput('');
+                            setTrainingFiles([]);
+                            setIsCreatingGPT(false);
+                          }} className="flex-1">
+                            Cancelar
+                          </Button>
+                          <Button onClick={createCustomGPT} className="flex-1">
+                            Crear GPT
+                          </Button>
+                        </div>
                       </div>
                       
-                      <div>
-                        <label className="text-sm font-medium">Vista previa de respuesta</label>
-                        <Textarea
-                          value={testOutput}
-                          readOnly
-                          placeholder="Aquí aparecerá la respuesta de prueba de tu GPT..."
-                          rows={8}
-                          className="bg-muted/50"
-                        />
-                      </div>
-                      
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <p className="text-sm text-blue-800">
-                          💡 <strong>Consejo:</strong> Refina las instrucciones hasta que las respuestas de prueba sean las que esperas.
-                        </p>
+                      <div className="space-y-4">
+                        <h3 className="font-medium text-lg">Probar funcionalidad</h3>
+                        <div>
+                          <label className="text-sm font-medium">Pregunta de prueba</label>
+                          <Textarea
+                            value={testInput}
+                            onChange={(e) => setTestInput(e.target.value)}
+                            placeholder="Escribe una pregunta para probar cómo respondería tu GPT..."
+                            rows={3}
+                          />
+                          <Button 
+                            size="sm" 
+                            className="mt-2 w-full"
+                            onClick={() => {
+                              if (testInput.trim() && newGPTInstructions.trim()) {
+                                setTestOutput(`GPT responde basado en: "${newGPTInstructions}"\n\nPregunta: ${testInput}\n\nRespuesta simulada: Esta sería la respuesta de tu GPT personalizado. En el entorno real, utilizaría las instrucciones proporcionadas para generar una respuesta especializada.`);
+                              } else {
+                                toast({
+                                  title: "Error",
+                                  description: "Agrega instrucciones y una pregunta de prueba",
+                                  variant: "destructive"
+                                });
+                              }
+                            }}
+                          >
+                            Probar respuesta
+                          </Button>
+                        </div>
+                        
+                        <div>
+                          <label className="text-sm font-medium">Vista previa de respuesta</label>
+                          <Textarea
+                            value={testOutput}
+                            readOnly
+                            placeholder="Aquí aparecerá la respuesta de prueba de tu GPT..."
+                            rows={8}
+                            className="bg-muted/50"
+                          />
+                        </div>
+                        
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <p className="text-sm text-blue-800">
+                            💡 <strong>Consejo:</strong> Refina las instrucciones hasta que las respuestas de prueba sean las que esperas.
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-              <div>
-                <label className="text-sm font-medium">Modo</label>
-                <Select value={mode} onValueChange={(v) => setMode(v as Mode)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Modo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="AUTO">AUTO</SelectItem>
-                    <SelectItem value="CON ASISTENTE BÁSICO">Con asistente básico</SelectItem>
-                    <SelectItem value="CON ASISTENTE DETALLADO">Con asistente detallado</SelectItem>
-                    <SelectItem value="SIN ASISTENTE">Sin asistente</SelectItem>
-                  </SelectContent>
-                </Select>
+                  </DialogContent>
+                </Dialog>
               </div>
-            </div>
 
-            {attachments.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Archivos adjuntos:</p>
-                <div className="flex flex-wrap gap-2">
-                  {attachments.map((attachment) => (
-                    <Badge key={attachment.id} variant="secondary" className="flex items-center gap-2">
-                      {attachment.type === 'image' && <Image className="h-3 w-3" />}
-                      {attachment.type === 'document' && <FileText className="h-3 w-3" />}
-                      {attachment.type === 'pdf' && <FileText className="h-3 w-3" />}
-                      <span className="text-xs">{attachment.name}</span>
-                      <button
-                        onClick={() => removeAttachment(attachment.id)}
-                        className="ml-1 hover:text-destructive"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                <div>
+                  <label className="text-sm font-medium">Modo</label>
+                  <Select value={mode} onValueChange={(v) => setMode(v as Mode)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Modo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AUTO">AUTO</SelectItem>
+                      <SelectItem value="CON ASISTENTE BÁSICO">Con asistente básico</SelectItem>
+                      <SelectItem value="CON ASISTENTE DETALLADO">Con asistente detallado</SelectItem>
+                      <SelectItem value="SIN ASISTENTE">Sin asistente</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-            )}
 
-            <div className="flex flex-wrap gap-2 justify-center">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="rounded-[20px]"
-                onClick={copyConversation}
-              >
-                <Copy className="h-4 w-4 mr-2" />
-                Copiar
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="rounded-[20px]"
-                onClick={() => downloadConversation('txt')}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Guardar como .txt
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="rounded-[20px]"
-                onClick={() => downloadConversation('docx')}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Guardar como .docx
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="rounded-[20px]"
-                onClick={() => downloadConversation('pdf')}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Guardar como .pdf
-              </Button>
-            </div>
+              {attachments.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Archivos adjuntos:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {attachments.map((attachment) => (
+                      <Badge key={attachment.id} variant="secondary" className="flex items-center gap-2">
+                        {attachment.type === 'image' && <Image className="h-3 w-3" />}
+                        {attachment.type === 'document' && <FileText className="h-3 w-3" />}
+                        {attachment.type === 'pdf' && <FileText className="h-3 w-3" />}
+                        <span className="text-xs">{attachment.name}</span>
+                        <button
+                          onClick={() => removeAttachment(attachment.id)}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-            <Separator />
+              <div className="flex flex-wrap gap-2 justify-center">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="rounded-[20px]"
+                  onClick={copyConversation}
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copiar
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="rounded-[20px]"
+                  onClick={() => downloadConversation('txt')}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Guardar como .txt
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="rounded-[20px]"
+                  onClick={() => downloadConversation('docx')}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Guardar como .docx
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="rounded-[20px]"
+                  onClick={() => downloadConversation('pdf')}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Guardar como .pdf
+                </Button>
+              </div>
 
-            <div className="flex justify-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleNewSearch}
-                className="flex items-center gap-2 rounded-[20px]"
-              >
-                <Plus className="h-4 w-4" />
-                Nueva búsqueda
-              </Button>
-            </div>
+              <Separator />
 
-            <Separator />
+              <div className="flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNewSearch}
+                  className="flex items-center gap-2 rounded-[20px]"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nueva búsqueda
+                </Button>
+              </div>
 
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-12 w-12 rounded-[20px] shrink-0"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Plus className="h-5 w-5" />
-              </Button>
-              
-              <Input
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Haz tu pregunta aquí... Ej: ¿Qué enzima es mejor para desmanchar grasa en superficies hospitalarias?"
-                className="flex-1 h-12 rounded-[20px] bg-input"
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+              <Separator />
+
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-12 w-12 rounded-[20px] shrink-0"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Plus className="h-5 w-5" />
+                </Button>
+                
+                <Input
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  placeholder="Haz tu pregunta aquí... Ej: ¿Qué enzima es mejor para desmanchar grasa en superficies hospitalarias?"
+                  className="flex-1 h-12 rounded-[20px] bg-input"
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                />
+                
+                <Button 
+                  onClick={handleSendMessage}
+                  className="h-12 px-8 rounded-[20px] bg-primary hover:bg-primary/90 shrink-0"
+                  disabled={!inputValue.trim()}
+                >
+                  Enviar
+                </Button>
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,.pdf,.doc,.docx,.txt,.csv,.xlsx"
+                onChange={handleFileUpload}
+                className="hidden"
               />
-              
-              <Button 
-                onClick={handleSendMessage}
-                className="h-12 px-8 rounded-[20px] bg-primary hover:bg-primary/90 shrink-0"
-                disabled={!inputValue.trim()}
-              >
-                Enviar
-              </Button>
             </div>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*,.pdf,.doc,.docx,.txt,.csv,.xlsx"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
           </div>
         </div>
       </div>
@@ -1224,4 +1169,6 @@ ${messages.map(msg =>
 };
 
 export default ChatScreen;
+
+
 
