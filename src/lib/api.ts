@@ -22,7 +22,7 @@ export interface ChatResponse {
  */
 export async function chat(messages: ChatMessage[]): Promise<ChatResponse> {
   // URL hardcodeada temporalmente hasta solucionar el problema de variables de entorno
-  const CHAT_ENDPOINT = 'https://ejmvuurulywxo7bwoswhre7ety0zgkrp.lambda-url.us-east-2.on.aws/';
+  const CHAT_ENDPOINT = 'https://7rdvqxagedcjnrcpakk5rywdbm0tdyxp.lambda-url.us-east-2.on.aws/';
   
   console.log('Usando endpoint hardcodeado:', CHAT_ENDPOINT);
 
