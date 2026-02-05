@@ -972,8 +972,9 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
                         <div>
                           <label className="text-sm font-medium mb-2 block">Archivos de entrenamiento (opcional)</label>
                           <TrainingFilesDropzone
-                            onFilesUploaded={(files) => setTrainingFiles(files)}
-                            existingFiles={trainingFiles}
+                            presignEndpoint={import.meta.env.VITE_PRESIGNED_URL_ENDPOINT || ''}
+                            onChange={(files) => setTrainingFiles(files)}
+                            userEmail={userEmail || 'anonymous'}
                           />
                           {!import.meta.env.VITE_PRESIGNED_URL_ENDPOINT && (
                             <p className="text-xs text-amber-600 mt-2">
