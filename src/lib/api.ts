@@ -21,13 +21,10 @@ export interface ChatResponse {
  * Usa la Lambda configurada en VITE_CHAT_ENDPOINT
  */
 export async function chat(messages: ChatMessage[]): Promise<ChatResponse> {
-  const CHAT_ENDPOINT = import.meta.env.VITE_CHAT_ENDPOINT;
+  // URL hardcodeada temporalmente hasta solucionar el problema de variables de entorno
+  const CHAT_ENDPOINT = 'https://ejmvuurulywxo7bwoswhre7ety0zgkrp.lambda-url.us-east-2.on.aws/';
   
-  // Si no hay endpoint configurado, mostrar mensaje de error
-  if (!CHAT_ENDPOINT) {
-    console.error('VITE_CHAT_ENDPOINT no está configurado');
-    throw new Error('Endpoint del chat no configurado. Contacta al administrador.');
-  }
+  console.log('Usando endpoint hardcodeado:', CHAT_ENDPOINT);
 
   console.log('Enviando mensajes a Lambda:', CHAT_ENDPOINT);
   console.log('Mensajes:', JSON.stringify(messages, null, 2));
