@@ -639,6 +639,27 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
       return chatMsg;
     });
 
+    // Agregar instrucciones del GPT seleccionado como mensaje de sistema
+    const allGPTs = [...defaultGPTs, ...customGPTs];
+    const currentGPT = allGPTs.find(g => g.id === selectedGPT);
+    
+    if (currentGPT && currentGPT.instructions) {
+      const systemMsg: ChatMessage = {
+        role: 'system',
+        content: currentGPT.instructions,
+      };
+      
+      if (currentGPT.trainingFiles && currentGPT.trainingFiles.length > 0) {
+        systemMsg.attachments = currentGPT.trainingFiles.map(f => ({
+          fileName: f.name,
+          fileType: f.type,
+          fileKey: f.key,
+        }));
+      }
+      
+      historyForApi.unshift(systemMsg);
+    }
+
     try {
       const replyText = await askChat(historyForApi, "gpt-4o-mini");
 
