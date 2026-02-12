@@ -96,6 +96,7 @@ const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
   const [editGPTDescription, setEditGPTDescription] = useState('');
   const [editGPTInstructions, setEditGPTInstructions] = useState('');
   const [editGPTIcon, setEditGPTIcon] = useState('🤖');
+  const [editTrainingFiles, setEditTrainingFiles] = useState<UploadedFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -628,6 +629,7 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
     setEditGPTDescription(gpt.description);
     setEditGPTInstructions(gpt.instructions);
     setEditGPTIcon(gpt.icon);
+    setEditTrainingFiles(gpt.trainingFiles || []);
     setIsEditingGPT(true);
   };
 
@@ -643,7 +645,14 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
 
     const updatedGPTs = customGPTs.map(gpt =>
       gpt.id === editingGPTId
-        ? { ...gpt, name: editGPTName.trim(), description: editGPTDescription.trim(), instructions: editGPTInstructions.trim(), icon: editGPTIcon }
+        ? { 
+            ...gpt, 
+            name: editGPTName.trim(), 
+            description: editGPTDescription.trim(), 
+            instructions: editGPTInstructions.trim(), 
+            icon: editGPTIcon,
+            trainingFiles: editTrainingFiles.length > 0 ? [...editTrainingFiles] : gpt.trainingFiles
+          }
         : gpt
     );
 
@@ -941,6 +950,50 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
                   placeholder="Define cómo debe comportarse este GPT..."
                   rows={6}
                 />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Archivos de entrenamiento</label>
+                {/* Archivos existentes */}
+                {editTrainingFiles.length > 0 && (
+                  <div className="mb-3 space-y-1">
+                    <p className="text-xs text-muted-foreground">Archivos actuales:</p>
+                    {editTrainingFiles.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 bg-muted/50 rounded text-xs">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-3 w-3" />
+                          <span className="truncate">{file.name}</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 w-5 p-0 text-destructive hover:text-destructive"
+                          onClick={() => {
+                            setEditTrainingFiles(editTrainingFiles.filter((_, i) => i !== index));
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Agregar nuevos archivos */}
+                <TrainingFilesDropzone
+                  presignEndpoint={import.meta.env.VITE_PRESIGNED_URL_ENDPOINT || ''}
+                  onChange={(files) => {
+                    const existingFiles = editTrainingFiles;
+                    const newFiles = files.filter(f => !existingFiles.some(ef => ef.key === f.key));
+                    setEditTrainingFiles([...existingFiles, ...newFiles]);
+                  }}
+                  userEmail={userEmail || 'anonymous'}
+                  gptId={editingGPTId || 'edit-gpt'}
+                />
+                {!import.meta.env.VITE_PRESIGNED_URL_ENDPOINT && (
+                  <p className="text-xs text-amber-600 mt-2">
+                    ⚠️ VITE_PRESIGN_ENDPOINT no configurado. Los archivos no se subirán.
+                  </p>
+                )}
               </div>
               <div className="flex gap-2 pt-2">
                 <Button variant="outline" onClick={() => setIsEditingGPT(false)} className="flex-1">
