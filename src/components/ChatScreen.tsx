@@ -90,6 +90,12 @@ const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
   const [trainingFiles, setTrainingFiles] = useState<UploadedFile[]>([]);
   
   const [mode, setMode] = useState<Mode>('AUTO');
+  const [isEditingGPT, setIsEditingGPT] = useState(false);
+  const [editingGPTId, setEditingGPTId] = useState<string | null>(null);
+  const [editGPTName, setEditGPTName] = useState('');
+  const [editGPTDescription, setEditGPTDescription] = useState('');
+  const [editGPTInstructions, setEditGPTInstructions] = useState('');
+  const [editGPTIcon, setEditGPTIcon] = useState('🤖');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -600,6 +606,58 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
     });
   };
 
+  const deleteCustomGPT = (gptId: string) => {
+    const gptToDelete = customGPTs.find(g => g.id === gptId);
+    const updatedGPTs = customGPTs.filter(g => g.id !== gptId);
+    setCustomGPTs(updatedGPTs);
+    localStorage.setItem('custom_gpts', JSON.stringify(updatedGPTs));
+    
+    if (selectedGPT === gptId) {
+      setSelectedGPT('gpt4');
+    }
+    
+    toast({
+      title: "GPT eliminado",
+      description: `Se ha eliminado el GPT "${gptToDelete?.name || ''}".`,
+    });
+  };
+
+  const startEditingGPT = (gpt: CustomGPT) => {
+    setEditingGPTId(gpt.id);
+    setEditGPTName(gpt.name);
+    setEditGPTDescription(gpt.description);
+    setEditGPTInstructions(gpt.instructions);
+    setEditGPTIcon(gpt.icon);
+    setIsEditingGPT(true);
+  };
+
+  const saveEditedGPT = () => {
+    if (!editingGPTId || !editGPTName.trim() || !editGPTInstructions.trim()) {
+      toast({
+        title: "Error",
+        description: "El nombre y las instrucciones son obligatorios.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const updatedGPTs = customGPTs.map(gpt =>
+      gpt.id === editingGPTId
+        ? { ...gpt, name: editGPTName.trim(), description: editGPTDescription.trim(), instructions: editGPTInstructions.trim(), icon: editGPTIcon }
+        : gpt
+    );
+
+    setCustomGPTs(updatedGPTs);
+    localStorage.setItem('custom_gpts', JSON.stringify(updatedGPTs));
+    setIsEditingGPT(false);
+    setEditingGPTId(null);
+
+    toast({
+      title: "GPT actualizado",
+      description: `Se ha actualizado el GPT "${editGPTName.trim()}".`,
+    });
+  };
+
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
 
@@ -787,28 +845,114 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
 
         <Separator className="my-4" />
         
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium mb-2">Historial de búsquedas</h4>
-          <ScrollArea className="h-[calc(30vh-80px)]">
-            {historialBusquedas.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-4">
-                No hay búsquedas previas
-              </p>
-            ) : (
-              <div className="space-y-1">
-                {historialBusquedas.map((busqueda, index) => (
-                  <div 
-                    key={index} 
-                    className="text-xs p-2 rounded hover:bg-accent/50 cursor-pointer transition-colors"
-                    onClick={() => setInputValue(busqueda)}
+        <div className="flex-1 flex flex-col min-h-0">
+          <h4 className="text-sm font-semibold mb-2">Listado de GPT</h4>
+          <ScrollArea className="flex-1">
+            <div className="space-y-2">
+              {customGPTs.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">
+                  No hay GPTs personalizados
+                </p>
+              ) : (
+                customGPTs.map((gpt) => (
+                  <Card 
+                    key={gpt.id} 
+                    className={`p-3 cursor-pointer hover:bg-accent/50 transition-colors ${
+                      selectedGPT === gpt.id ? 'bg-accent' : ''
+                    }`}
+                    onClick={() => setSelectedGPT(gpt.id)}
                   >
-                    {busqueda}
-                  </div>
-                ))}
-              </div>
-            )}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="text-lg">{gpt.icon}</span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{gpt.name}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEditingGPT(gpt);
+                          }}
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteCustomGPT(gpt.id);
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))
+              )}
+            </div>
           </ScrollArea>
         </div>
+
+        {/* Dialog para editar GPT */}
+        <Dialog open={isEditingGPT} onOpenChange={setIsEditingGPT}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar GPT: {editGPTName}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Nombre del GPT</label>
+                <Input
+                  value={editGPTName}
+                  onChange={(e) => setEditGPTName(e.target.value)}
+                  placeholder="Nombre del GPT"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Descripción</label>
+                <Input
+                  value={editGPTDescription}
+                  onChange={(e) => setEditGPTDescription(e.target.value)}
+                  placeholder="Breve descripción"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Icono (emoji)</label>
+                <Input
+                  value={editGPTIcon}
+                  onChange={(e) => setEditGPTIcon(e.target.value)}
+                  placeholder="🤖"
+                  className="w-20"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Instrucciones del sistema</label>
+                <Textarea
+                  value={editGPTInstructions}
+                  onChange={(e) => setEditGPTInstructions(e.target.value)}
+                  placeholder="Define cómo debe comportarse este GPT..."
+                  rows={6}
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" onClick={() => setIsEditingGPT(false)} className="flex-1">
+                  Cancelar
+                </Button>
+                <Button onClick={saveEditedGPT} className="flex-1">
+                  Guardar cambios
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <div className="mt-auto pt-4 space-y-2">
           <Button 
@@ -1191,6 +1335,3 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
 };
 
 export default ChatScreen;
-
-
-
