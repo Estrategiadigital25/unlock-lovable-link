@@ -10,41 +10,6 @@ interface LoginScreenProps {
   onLogin: () => void;
 }
 
-// Lista de emails autorizados - solo estos pueden registrarse
-export const AUTHORIZED_EMAILS = [
-  'liderdesarrollo@iespecialidades.com',
-  'estrategiadigital@iespecialidades.com',
-  'lideralimentos@iespecialidades.com',
-  'contabilidad2@iespecialidades.com',
-  'cesar.ospina@iespecialidades.com',
-  'contabilidad@iespecialidades.com',
-  'juan.espejo@iespecialidades.com',
-  'servicioalcliente@iespecialidades.com',
-  'factura@iespecialidades.com',
-  'janeth.gomez@iespecialidades.com',
-  'jimena.porras@iespecialidades.com',
-  'compras@iespecialidades.com',
-  'lidercontable@iespecialidades.com',
-  'procesos@iespecialidades.com',
-  'gear@iespecialidades.com',
-  'laboratorio3@iespecialidades.com',
-  'laboratorio9@iespecialidades.com',
-  'laboratorio6@iespecialidades.com',
-  'catalina.ospina@iespecialidades.com',
-  'operaciones@iespecialidades.com',
-  'laboratorio5@iespecialidades.com',
-  'powerbi@iespecialidades.com',
-  'powerbi2@iespecialidades.com',
-  'practicante@iespecialidades.com',
-  'laboratorio8@iespecialidades.com',
-  'auxiliaradministrativa@iespecialidades.com',
-  'wilmer.pinzon@iespecialidades.com',
-  'liderformuladores@iespecialidades.com',
-  'lorena.hurtado@iespecialidades.com',
-  'prueba@iespecialidades.com', // ✅ COMA AGREGADA AQUÍ
-  'angie.loaiza@iespecialidades.com'
-];
-
 const LoginScreen = ({ onLogin }: LoginScreenProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -70,16 +35,6 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
       toast({
         title: "Acceso denegado",
         description: "Solo correos @iespecialidades.com están permitidos.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validar que esté en la lista de autorizados
-    if (!AUTHORIZED_EMAILS.includes(trimmedEmail)) {
-      toast({
-        title: "Acceso denegado",
-        description: "Tu email no está autorizado para usar esta aplicación.",
         variant: "destructive"
       });
       return;
@@ -122,7 +77,7 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
             throw new Error('Email o contraseña incorrectos');
           }
           if (error.message.includes('Email not confirmed')) {
-            throw new Error('Por favor verifica tu email antes de iniciar sesión');
+            throw new Error('Por favor verifica tu email antes de iniciar sesión. Revisa tu bandeja de entrada y spam.');
           }
           throw error;
         }
@@ -270,4 +225,3 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
 };
 
 export default LoginScreen;
-
