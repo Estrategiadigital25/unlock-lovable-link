@@ -87,6 +87,7 @@ const ChatScreen = ({ onAdminPanel, onLogout }: ChatScreenProps) => {
   const [newGPTInstructions, setNewGPTInstructions] = useState('');
   const [testInput, setTestInput] = useState('');
   const [testOutput, setTestOutput] = useState('');
+  const [testLoading, setTestLoading] = useState(false);
   const [trainingFiles, setTrainingFiles] = useState<UploadedFile[]>([]);
   
   const [mode, setMode] = useState<Mode>('AUTO');
@@ -767,17 +768,9 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
               variant="outline"
               size="sm"
               className="h-8 w-8 p-0"
+              title="Configuración"
             >
               <Settings className="h-4 w-4" />
-            </Button>
-            <Button
-              onClick={onLogout}
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-              title="Cerrar sesión"
-            >
-              <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -908,6 +901,24 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
               )}
             </div>
           </ScrollArea>
+        </div>
+
+        <Separator className="my-3" />
+        
+        {/* Botón de cerrar sesión */}
+        <div className="flex-shrink-0 pb-2">
+          <div className="text-xs text-muted-foreground text-center mb-2 truncate">
+            {userEmail}
+          </div>
+          <Button
+            onClick={onLogout}
+            variant="outline"
+            size="sm"
+            className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Cerrar sesión
+          </Button>
         </div>
 
         {/* Dialog para editar GPT */}
@@ -1211,9 +1222,36 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
                           <Button 
                             size="sm" 
                             className="mt-2 w-full"
-                            onClick={() => {
+                            disabled={testLoading}
+                            onClick={async () => {
                               if (testInput.trim() && newGPTInstructions.trim()) {
-                                setTestOutput(`GPT responde basado en: "${newGPTInstructions}"\n\nPregunta: ${testInput}\n\nRespuesta simulada: Esta sería la respuesta de tu GPT personalizado. En el entorno real, utilizaría las instrucciones proporcionadas para generar una respuesta especializada.`);
+                                setTestLoading(true);
+                                setTestOutput('Consultando con ChatGPT...');
+                                try {
+                                  const testMessages: ChatMessage[] = [
+                                    {
+                                      role: 'system',
+                                      content: newGPTInstructions,
+                                      ...(trainingFiles.length > 0 ? {
+                                        attachments: trainingFiles.map(f => ({
+                                          fileName: f.name,
+                                          fileType: f.type,
+                                          fileKey: f.key,
+                                        }))
+                                      } : {})
+                                    },
+                                    {
+                                      role: 'user',
+                                      content: testInput,
+                                    }
+                                  ];
+                                  const response = await askChat(testMessages, "gpt-4o-mini");
+                                  setTestOutput(response.reply);
+                                } catch (error) {
+                                  setTestOutput(`Error al probar: ${error instanceof Error ? error.message : 'Error desconocido'}. Verifica que la Lambda esté funcionando.`);
+                                } finally {
+                                  setTestLoading(false);
+                                }
                               } else {
                                 toast({
                                   title: "Error",
@@ -1223,7 +1261,14 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
                               }
                             }}
                           >
-                            Probar respuesta
+                            {testLoading ? (
+                              <>
+                                <span className="mr-2 h-4 w-4 animate-spin">⏳</span>
+                                Probando...
+                              </>
+                            ) : (
+                              'Probar respuesta'
+                            )}
                           </Button>
                         </div>
                         
