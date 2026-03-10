@@ -688,6 +688,67 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
     setInputValue('');
     setAttachments([]);
 
+    // ============================================================
+    // MODO IMAGEN: Generar imagen con Gemini
+    // ============================================================
+    if (selectedGPT === 'image-generator') {
+      try {
+        const CHAT_ENDPOINT = import.meta.env.VITE_CHAT_ENDPOINT;
+        if (!CHAT_ENDPOINT) throw new Error('VITE_CHAT_ENDPOINT no configurado');
+
+        console.log('Generando imagen con Gemini. Prompt:', inputValue);
+        const response = await fetch(CHAT_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'image', prompt: inputValue }),
+        });
+
+        const data = await response.json();
+        console.log('Respuesta de Gemini:', data);
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        let assistantContent = '';
+        if (data.imageBase64) {
+          // Insertar imagen como marcador especial que se renderizará como <img>
+          assistantContent = `[GENERATED_IMAGE:${data.imageMimeType}:${data.imageBase64}]`;
+          if (data.textResponse) {
+            assistantContent += '\n\n' + data.textResponse;
+          }
+        } else if (data.reply) {
+          assistantContent = data.reply;
+        } else {
+          assistantContent = 'No se pudo generar la imagen. Intenta con un prompt más descriptivo.';
+        }
+
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          type: 'assistant',
+          content: assistantContent,
+          timestamp: new Date(),
+          gptUsed: 'Gemini - Generador de Imágenes'
+        };
+
+        setMessages((prev) => [...prev, assistantMessage]);
+        setTimeout(() => { saveCurrentConversation(); }, 100);
+
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        toast({
+          title: 'Error al generar imagen',
+          description: msg,
+          variant: 'destructive',
+        });
+      }
+      return;
+    }
+
+    // ============================================================
+    // MODO CHAT: Flujo normal con OpenAI
+    // ============================================================
+
     const finalMode = mode === 'AUTO' ? detectMode(userMessage.content) : mode;
 
     const historyForApi: ChatMessage[] = updatedMessages.map((m) => {
@@ -1072,7 +1133,37 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
                           : 'bg-muted'
                       }`}
                     >
-                      <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                      <p className="whitespace-pre-wrap break-words">
+                        {message.content.startsWith('[GENERATED_IMAGE:') ? (
+                          (() => {
+                            const match = message.content.match(/^\[GENERATED_IMAGE:([^:]+):([^\]]+)\]([\s\S]*)/);
+                            if (match) {
+                              const mimeType = match[1];
+                              const base64 = match[2];
+                              const extraText = match[3]?.trim();
+                              return (
+                                <>
+                                  <img 
+                                    src={`data:${mimeType};base64,${base64}`} 
+                                    alt="Imagen generada por Gemini AI"
+                                    className="max-w-full rounded-lg mb-2"
+                                    style={{ maxHeight: '512px' }}
+                                  />
+                                  <a 
+                                    href={`data:${mimeType};base64,${base64}`} 
+                                    download={`imagen-gemini-${Date.now()}.png`}
+                                    className="text-xs underline opacity-70 block mb-2"
+                                  >
+                                    ⬇️ Descargar imagen
+                                  </a>
+                                  {extraText && <span>{extraText}</span>}
+                                </>
+                              );
+                            }
+                            return message.content;
+                          })()
+                        ) : message.content}
+                      </p>
                       {message.attachments && message.attachments.length > 0 && (
                         <div className="mt-2 space-y-1">
                           {message.attachments.map((att) => (
@@ -1132,6 +1223,13 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
                         ))}
                       </>
                     )}
+                    <Separator className="my-2" />
+                    <SelectItem value="image-generator">
+                      <div className="flex items-center gap-2">
+                        <span>🎨</span>
+                        <span>Generar Imagen (Gemini AI)</span>
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -1402,7 +1500,10 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
                 <Input
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  placeholder="Haz tu pregunta aquí... Ej: ¿Qué enzima es mejor para desmanchar grasa en superficies hospitalarias?"
+                  placeholder={selectedGPT === 'image-generator' 
+                    ? "Describe la imagen que quieres generar... Ej: Un gato astronauta en el espacio"
+                    : "Haz tu pregunta aquí... Ej: ¿Qué enzima es mejor para desmanchar grasa en superficies hospitalarias?"
+                  }
                   className="flex-1 h-12 rounded-[20px] bg-input"
                   onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                 />
