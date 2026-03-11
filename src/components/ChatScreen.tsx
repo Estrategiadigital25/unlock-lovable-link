@@ -729,7 +729,7 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
     }
 
     try {
-      const replyText = await askChat(historyForApi, "gpt-4o-mini");
+      const replyText = await askChat(historyForApi, "gpt-5-mini");
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
