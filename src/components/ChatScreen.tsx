@@ -758,7 +758,7 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
   };
 
   return (
-    <div className="min-h-screen bg-background font-montserrat flex">
+    <div className="h-screen bg-background font-montserrat flex overflow-hidden">
       <div className="w-80 bg-card border-r border-border p-4 flex flex-col">
         <div className="flex items-center justify-between mb-6">
           <h3 className="font-semibold text-foreground">Historial</h3>
