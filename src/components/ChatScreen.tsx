@@ -1245,7 +1245,7 @@ ${messages.map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}:\n${msg.
                                       content: testInput,
                                     }
                                   ];
-                                  const response = await askChat(testMessages, "gpt-5-mini");
+                                  const response = await askChat(testMessages, "gpt-5-mini-2025-08-07");
                                   setTestOutput(response.reply);
                                 } catch (error) {
                                   setTestOutput(`Error al probar: ${error instanceof Error ? error.message : 'Error desconocido'}. Verifica que la Lambda esté funcionando.`);
