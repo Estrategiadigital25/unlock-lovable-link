@@ -1,5 +1,4 @@
 // src/lib/api.ts
-
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -9,7 +8,6 @@ export interface ChatMessage {
     fileKey: string;
   }>;
 }
-
 export interface ChatResponse {
   reply: string;
   model?: string;
@@ -20,15 +18,12 @@ export interface ChatResponse {
  * Función principal para enviar mensajes al chat
  * Usa la Lambda configurada en VITE_CHAT_ENDPOINT
  */
-export async function chat(messages: ChatMessage[]): Promise<ChatResponse> {
-  // URL hardcodeada temporalmente hasta solucionar el problema de variables de entorno
+export async function chat(messages: ChatMessage[], model: string = 'gpt-5-mini-2025-08-07'): Promise<ChatResponse> {
   const CHAT_ENDPOINT = 'https://7rdvqxagedcjnrcpakk5rywdbm0tdyxp.lambda-url.us-east-2.on.aws/';
   
   console.log('Usando endpoint hardcodeado:', CHAT_ENDPOINT);
-
   console.log('Enviando mensajes a Lambda:', CHAT_ENDPOINT);
   console.log('Mensajes:', JSON.stringify(messages, null, 2));
-
   try {
     const response = await fetch(CHAT_ENDPOINT, {
       method: 'POST',
@@ -37,11 +32,9 @@ export async function chat(messages: ChatMessage[]): Promise<ChatResponse> {
       },
       body: JSON.stringify({
         messages,
-        model: 'gpt-4o-mini',
-        temperature: 0.7,
+        model: model,
       })
     });
-
     const text = await response.text();
     console.log('Respuesta de Lambda (raw):', text);
     
@@ -49,7 +42,6 @@ export async function chat(messages: ChatMessage[]): Promise<ChatResponse> {
       console.error('Error de Lambda:', response.status, text);
       throw new Error(`Error del servidor: ${response.status}`);
     }
-
     let data: ChatResponse;
     try {
       data = JSON.parse(text);
@@ -58,10 +50,8 @@ export async function chat(messages: ChatMessage[]): Promise<ChatResponse> {
       console.error('Texto recibido:', text?.slice?.(0, 500));
       throw new Error('Respuesta inválida del servidor');
     }
-
     console.log('Respuesta procesada:', data);
     return data;
-
   } catch (error) {
     console.error('Error en función chat():', error);
     throw error;
@@ -94,9 +84,7 @@ export async function generatePresignedUrl(
   if (!PRESIGNED_URL_ENDPOINT) {
     throw new Error('Endpoint de presigned URLs no configurado');
   }
-
   console.log('Generando presigned URL para:', fileName);
-
   const response = await fetch(PRESIGNED_URL_ENDPOINT, {
     method: 'POST',
     headers: {
@@ -110,13 +98,11 @@ export async function generatePresignedUrl(
       gptId,
     }),
   });
-
   if (!response.ok) {
     const errorText = await response.text();
     console.error('Error generando presigned URL:', errorText);
     throw new Error('Error al generar URL de subida');
   }
-
   const data = await response.json();
   console.log('Presigned URL generada:', data.fileKey);
   
@@ -131,7 +117,6 @@ export async function uploadFileToS3(
   uploadUrl: string
 ): Promise<void> {
   console.log('Subiendo archivo a S3:', file.name);
-
   const response = await fetch(uploadUrl, {
     method: 'PUT',
     headers: {
@@ -139,12 +124,10 @@ export async function uploadFileToS3(
     },
     body: file,
   });
-
   if (!response.ok) {
     const errorText = await response.text();
     console.error('Error subiendo archivo a S3:', errorText);
     throw new Error('Error al subir archivo');
   }
-
   console.log('Archivo subido exitosamente:', file.name);
 }
